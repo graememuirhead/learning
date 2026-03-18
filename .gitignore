@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+.Python
+dist/
+build/
+*.egg-info/
+.python_packages/
+
+# Azure Functions local settings (contains secrets)
+local.settings.json
+
+# Assets – certificates and service account credentials (NEVER commit these)
+assets/apple_pass_certificate.pem
+assets/apple_pass_key.pem
+assets/google_service_account.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+
+# Pytest
+.pytest_cache/
+htmlcov/
+.coverage

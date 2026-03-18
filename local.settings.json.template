@@ -1,0 +1,26 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "<your-storage-connection-string>",
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+    "FUNCTIONS_EXTENSION_VERSION": "~4",
+
+    "BASE_URL": "https://<your-function-app>.azurewebsites.net/api",
+
+    "STORAGE_CONNECTION_STRING": "<your-storage-connection-string>",
+    "STORAGE_CONTAINER_PASSES": "passes",
+
+    "APPLE_PASS_TYPE_IDENTIFIER": "pass.com.ryetri.membership",
+    "APPLE_TEAM_IDENTIFIER": "<your-10-char-apple-team-id>",
+    "APPLE_PASS_CERTIFICATE_PEM": "<base64-encoded-pass-certificate.pem>",
+    "APPLE_PASS_KEY_PEM": "<base64-encoded-pass-key.pem>",
+    "APPLE_WWDR_CERTIFICATE_PEM": "<base64-encoded-AppleWWDRCAG3.pem>",
+    "APPLE_KEY_PASSWORD": "",
+
+    "GOOGLE_ISSUER_ID": "<your-google-wallet-issuer-id>",
+    "GOOGLE_CLASS_SUFFIX": "ryetri_membership",
+    "GOOGLE_SERVICE_ACCOUNT_JSON": "<base64-encoded-service-account.json>",
+
+    "LOGO_FILENAME": "logo.png"
+  }
+}
