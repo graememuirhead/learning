@@ -20,7 +20,7 @@ class Settings:
 
     # ---- Apple Wallet ----
     APPLE_PASS_TYPE_IDENTIFIER: str = os.environ.get(
-        "APPLE_PASS_TYPE_IDENTIFIER", "pass.com.ryetri.membership"
+        "APPLE_PASS_TYPE_IDENTIFIER", "pass.com.ryetriclub.membership"
     )
     APPLE_TEAM_IDENTIFIER: str = os.environ.get("APPLE_TEAM_IDENTIFIER", "")
     APPLE_KEY_PASSWORD: str = os.environ.get("APPLE_KEY_PASSWORD", "")

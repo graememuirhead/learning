@@ -131,7 +131,7 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
         //   (b) Store in Key Vault and reference: @Microsoft.KeyVault(SecretUri=...)
         {
           name: 'APPLE_PASS_TYPE_IDENTIFIER'
-          value: 'pass.com.ryetri.membership'
+          value: 'pass.com.ryetriclub.membership'
         }
         {
           name: 'APPLE_TEAM_IDENTIFIER'

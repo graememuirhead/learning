@@ -10,7 +10,7 @@
     "STORAGE_CONNECTION_STRING": "<your-storage-connection-string>",
     "STORAGE_CONTAINER_PASSES": "passes",
 
-    "APPLE_PASS_TYPE_IDENTIFIER": "pass.com.ryetri.membership",
+    "APPLE_PASS_TYPE_IDENTIFIER": "pass.com.ryetriclub.membership",
     "APPLE_TEAM_IDENTIFIER": "<your-10-char-apple-team-id>",
     "APPLE_PASS_CERTIFICATE_PEM": "<base64-encoded-pass-certificate.pem>",
     "APPLE_PASS_KEY_PEM": "<base64-encoded-pass-key.pem>",

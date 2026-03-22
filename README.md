@@ -42,7 +42,7 @@ Azure Key Vault (optional)       ← store certificates securely
 ### Apple Wallet
 
 1. Enrol in the [Apple Developer Program](https://developer.apple.com/programs/) ($99/year).
-2. Create a **Pass Type ID** in the Developer Portal (e.g. `pass.com.ryetri.membership`).
+2. Create a **Pass Type ID** in the Developer Portal (e.g. `pass.com.ryetriclub.membership`).
 3. Generate a Pass Type ID certificate and download it.
 4. Export the certificate + private key as PEM files:
 
@@ -120,7 +120,7 @@ Set these in `local.settings.json` for local dev, or as Application Settings in 
 |---|---|
 | `BASE_URL` | Public base URL of your Function App, e.g. `https://ryetri-prod-func.azurewebsites.net/api` |
 | `STORAGE_CONNECTION_STRING` | Azure Storage connection string |
-| `APPLE_PASS_TYPE_IDENTIFIER` | Your Pass Type ID, e.g. `pass.com.ryetri.membership` |
+| `APPLE_PASS_TYPE_IDENTIFIER` | Your Pass Type ID, e.g. `pass.com.ryetriclub.membership` |
 | `APPLE_TEAM_IDENTIFIER` | Your 10-character Apple Team ID |
 | `APPLE_PASS_CERTIFICATE_PEM` | Base64-encoded pass certificate PEM |
 | `APPLE_PASS_KEY_PEM` | Base64-encoded private key PEM |
