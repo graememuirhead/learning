@@ -19,6 +19,9 @@ assets/apple_pass_certificate.pem
 assets/apple_pass_key.pem
 assets/google_service_account.json
 
+# Local test scripts (contain API keys)
+test_api.sh
+
 # OS
 .DS_Store
 Thumbs.db
