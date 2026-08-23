@@ -27,6 +27,14 @@ Thumbs.db
 .vscode/
 .idea/
 
+# Terraform
+infra/terraform/.terraform/
+infra/terraform/.terraform.lock.hcl
+infra/terraform/tfplan
+infra/terraform/terraform.tfvars
+infra/terraform/*.tfstate
+infra/terraform/*.tfstate.backup
+
 # Pytest
 .pytest_cache/
 htmlcov/

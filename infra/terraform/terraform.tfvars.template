@@ -1,0 +1,19 @@
+# Copy this file to terraform.tfvars and fill in the values.
+# terraform.tfvars is excluded from git — never commit it.
+
+app_name    = "ryetri"
+environment = "prod"
+location    = "uksouth"   # change to your preferred Azure region
+
+apple_pass_type_identifier = "pass.com.ryetriclub.membership"
+apple_team_identifier      = ""   # your 10-char Apple Team ID
+apple_pass_certificate_pem = ""   # base64: base64 -i apple_pass_certificate.pem | tr -d '\n'
+apple_pass_key_pem         = ""   # base64: base64 -i apple_pass_key.pem | tr -d '\n'
+apple_wwdr_certificate_pem = ""   # base64: base64 -i AppleWWDRCAG3.pem | tr -d '\n'
+apple_key_password         = ""   # leave blank if key has no password
+
+google_issuer_id            = ""  # from Google Pay & Wallet Console
+google_class_suffix         = "ryetri_membership"
+google_service_account_json = ""  # base64: base64 -i google_service_account.json | tr -d '\n'
+
+logo_filename = "logo.png"
