@@ -3,7 +3,7 @@
 
 app_name    = "ryetri"
 environment = "prod"
-location    = "uksouth"   # change to your preferred Azure region
+location    = "eastus"
 
 apple_pass_type_identifier = "pass.com.ryetriclub.membership"
 apple_team_identifier      = ""   # your 10-char Apple Team ID
