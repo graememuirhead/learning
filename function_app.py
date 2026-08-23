@@ -190,7 +190,7 @@ def _issue_google_pass(
 # GET /api/pass/{pass_id}
 # =========================================================================== #
 
-@app.route(route="pass/{pass_id}", methods=["GET"])
+@app.route(route="pass/{pass_id}", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
 def get_pass(req: func.HttpRequest) -> func.HttpResponse:
     """
     For Apple passes: stream the .pkpass binary so the user can tap "Add to Wallet".
@@ -240,6 +240,7 @@ def get_pass(req: func.HttpRequest) -> func.HttpResponse:
 @app.route(
     route="apple/devices/{device_id}/registrations/{pass_type_id}/{serial}",
     methods=["POST"],
+    auth_level=func.AuthLevel.ANONYMOUS,
 )
 def apple_register_device(
     req: func.HttpRequest,
@@ -281,6 +282,7 @@ def apple_register_device(
 @app.route(
     route="apple/devices/{device_id}/registrations/{pass_type_id}/{serial}",
     methods=["DELETE"],
+    auth_level=func.AuthLevel.ANONYMOUS,
 )
 def apple_unregister_device(
     req: func.HttpRequest,
@@ -303,6 +305,7 @@ def apple_unregister_device(
 @app.route(
     route="apple/passes/{pass_type_id}/{serial}",
     methods=["GET"],
+    auth_level=func.AuthLevel.ANONYMOUS,
 )
 def apple_get_latest_pass(
     req: func.HttpRequest,
@@ -337,7 +340,7 @@ def apple_get_latest_pass(
 # Apple Wallet Web Service  – error log
 # =========================================================================== #
 
-@app.route(route="apple/log", methods=["POST"])
+@app.route(route="apple/log", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def apple_log(req: func.HttpRequest) -> func.HttpResponse:
     """Receive and log error messages from Apple Wallet."""
     try:
