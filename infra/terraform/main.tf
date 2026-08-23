@@ -1,12 +1,17 @@
+resource "random_id" "suffix" {
+  byte_length = 3
+}
+
 locals {
-  suffix               = "${var.app_name}-${var.environment}"
-  storage_account_name = substr(replace("${var.app_name}${var.environment}st", "-", ""), 0, 24)
-  function_app_name    = "${local.suffix}-func"
+  suffix                = "${var.app_name}-${var.environment}"
+  unique_suffix         = "${local.suffix}-${random_id.suffix.hex}"
+  storage_account_name  = substr(replace("${var.app_name}${var.environment}st", "-", ""), 0, 24)
+  function_app_name     = "${local.suffix}-func"
   app_service_plan_name = "${local.suffix}-plan"
-  app_insights_name    = "${local.suffix}-ai"
-  log_analytics_name   = "${local.suffix}-law"
-  key_vault_name       = "${local.suffix}-kv"
-  base_url             = "https://${local.function_app_name}.azurewebsites.net/api"
+  app_insights_name     = "${local.suffix}-ai"
+  log_analytics_name    = "${local.suffix}-law"
+  key_vault_name        = "${local.unique_suffix}-kv"
+  base_url              = "https://${local.function_app_name}.azurewebsites.net/api"
 }
 
 # --------------------------------------------------------------------------- #
