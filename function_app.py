@@ -191,13 +191,12 @@ def _issue_google_pass(
 # =========================================================================== #
 
 @app.route(route="pass/{pass_id}", methods=["GET"])
-def get_pass(req: func.HttpRequest, pass_id: str = None) -> func.HttpResponse:
+def get_pass(req: func.HttpRequest) -> func.HttpResponse:
     """
     For Apple passes: stream the .pkpass binary so the user can tap "Add to Wallet".
     For Google passes: redirect to the Google Wallet save URL.
     """
-    if pass_id is None:
-        pass_id = req.route_params.get("pass_id", "")
+    pass_id = req.route_params.get("pass_id", "")
 
     pass_record = db.get_issued_pass(pass_id)
     if not pass_record:
@@ -244,18 +243,13 @@ def get_pass(req: func.HttpRequest, pass_id: str = None) -> func.HttpResponse:
 )
 def apple_register_device(
     req: func.HttpRequest,
-    device_id: str = None,
-    pass_type_id: str = None,
-    serial: str = None,
 ) -> func.HttpResponse:
     """
     Apple calls this when a user adds the pass to Wallet.
     Enforces the one-wallet restriction.
     """
-    if device_id is None:
-        device_id = req.route_params.get("device_id", "")
-    if serial is None:
-        serial = req.route_params.get("serial", "")
+    device_id = req.route_params.get("device_id", "")
+    serial = req.route_params.get("serial", "")
 
     # Authenticate using the Authorization header: "ApplePass <token>"
     if not _verify_apple_auth(req, serial):
@@ -290,15 +284,10 @@ def apple_register_device(
 )
 def apple_unregister_device(
     req: func.HttpRequest,
-    device_id: str = None,
-    pass_type_id: str = None,
-    serial: str = None,
 ) -> func.HttpResponse:
     """Apple calls this when a user removes the pass from Wallet."""
-    if device_id is None:
-        device_id = req.route_params.get("device_id", "")
-    if serial is None:
-        serial = req.route_params.get("serial", "")
+    device_id = req.route_params.get("device_id", "")
+    serial = req.route_params.get("serial", "")
 
     if not _verify_apple_auth(req, serial):
         return func.HttpResponse(status_code=401)
@@ -317,15 +306,12 @@ def apple_unregister_device(
 )
 def apple_get_latest_pass(
     req: func.HttpRequest,
-    pass_type_id: str = None,
-    serial: str = None,
 ) -> func.HttpResponse:
     """
     Apple calls this when it needs the latest version of a pass
     (e.g. after receiving a push notification, or on periodic refresh).
     """
-    if serial is None:
-        serial = req.route_params.get("serial", "")
+    serial = req.route_params.get("serial", "")
 
     if not _verify_apple_auth(req, serial):
         return func.HttpResponse(status_code=401)
