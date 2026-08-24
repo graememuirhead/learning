@@ -12,15 +12,12 @@ terraform {
     }
   }
 
-  # Uncomment this block to store Terraform state in Azure Blob Storage
-  # (recommended for team use / CI-CD)
-  #
-  # backend "azurerm" {
-  #   resource_group_name  = "rye-tri-tfstate-rg"
-  #   storage_account_name = "ryetritfstate"
-  #   container_name       = "tfstate"
-  #   key                  = "rye-tri.tfstate"
-  # }
+  backend "azurerm" {
+    resource_group_name  = "rye-tri-tfstate-rg"
+    storage_account_name = "ryetritfstate"
+    container_name       = "tfstate"
+    key                  = "rye-tri.tfstate"
+  }
 }
 
 provider "azurerm" {
