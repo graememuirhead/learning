@@ -37,6 +37,7 @@ SCOPES = ["https://www.googleapis.com/auth/wallet_object.issuer"]
 
 def build_save_url(
     name: str,
+    email: str,
     member_number: str,
     expiry_date: str,
     serial_number: str,
@@ -47,6 +48,7 @@ def build_save_url(
 
     Args:
         name:                Full name of the member.
+        email:               Member's email address.
         member_number:       Club membership number.
         expiry_date:         ISO 8601 date, e.g. "2026-12-31".
         serial_number:       Unique pass identifier (UUID).
@@ -68,7 +70,7 @@ def build_save_url(
         "payload": {
             "genericObjects": [
                 _build_generic_object(
-                    object_id, class_id, name, member_number, expiry_date
+                    object_id, class_id, name, email, member_number, expiry_date
                 )
             ],
         },
@@ -169,6 +171,7 @@ def _build_generic_object(
     object_id: str,
     class_id: str,
     name: str,
+    email: str,
     member_number: str,
     expiry_date: str,
 ) -> dict:
@@ -227,6 +230,11 @@ def _build_generic_object(
                 "id": "expiry",
                 "header": "VALID THROUGH",
                 "body": expiry_date,
+            },
+            {
+                "id": "email",
+                "header": "EMAIL",
+                "body": email,
             },
             {
                 "id": "location",

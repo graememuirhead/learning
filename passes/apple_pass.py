@@ -35,6 +35,7 @@ logger = logging.getLogger(__name__)
 
 def build_pkpass(
     name: str,
+    email: str,
     member_number: str,
     expiry_date: str,
     serial_number: str,
@@ -45,6 +46,7 @@ def build_pkpass(
 
     Args:
         name:                 Full name of the member.
+        email:                Member's email address.
         member_number:        Club membership number (string).
         expiry_date:          ISO 8601 date string, e.g. "2026-12-31".
         serial_number:        Unique identifier for this pass (UUID).
@@ -53,7 +55,7 @@ def build_pkpass(
     Returns:
         Raw bytes of the signed .pkpass ZIP archive.
     """
-    pass_json = _build_pass_json(name, member_number, expiry_date, serial_number, authentication_token)
+    pass_json = _build_pass_json(name, email, member_number, expiry_date, serial_number, authentication_token)
     logo_bytes = Settings.get_logo_bytes()
 
     # Build icon: derive a small copy of the logo (or use the same image).
@@ -83,6 +85,7 @@ def build_pkpass(
 
 def _build_pass_json(
     name: str,
+    email: str,
     member_number: str,
     expiry_date: str,
     serial_number: str,
@@ -160,6 +163,11 @@ def _build_pass_json(
                     "key": "member_number_back",
                     "label": "MEMBER NUMBER",
                     "value": member_number,
+                },
+                {
+                    "key": "email_back",
+                    "label": "EMAIL",
+                    "value": email,
                 },
                 {
                     "key": "expiry_back",

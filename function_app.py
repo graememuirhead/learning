@@ -59,6 +59,7 @@ def create_pass(req: func.HttpRequest) -> func.HttpResponse:
 
     Request body (JSON):
         name          (str, required)  – member's full name
+        email         (str, required)  – member's email address
         member_number (str, required)  – club membership number
         expiry_date   (str, required)  – ISO 8601 date, e.g. "2026-12-31"
         wallet_type   (str, required)  – "apple" or "google"
@@ -78,17 +79,22 @@ def create_pass(req: func.HttpRequest) -> func.HttpResponse:
         return _bad_request("Request body must be valid JSON.")
 
     name = _str(body, "name")
+    email = _str(body, "email").lower()
     member_number = _str(body, "member_number")
     expiry_date = _str(body, "expiry_date")
     wallet_type = _str(body, "wallet_type", "").lower()
 
     # Validation
-    if not all([name, member_number, expiry_date]):
+    if not all([name, email, member_number, expiry_date]):
         logger.warning(
-            "request_id=%s missing required fields: name=%r member_number=%r expiry_date=%r",
-            request_id, bool(name), bool(member_number), bool(expiry_date),
+            "request_id=%s missing required fields: name=%r email=%r member_number=%r expiry_date=%r",
+            request_id, bool(name), bool(email), bool(member_number), bool(expiry_date),
         )
-        return _bad_request("Fields 'name', 'member_number', and 'expiry_date' are required.")
+        return _bad_request("Fields 'name', 'email', 'member_number', and 'expiry_date' are required.")
+
+    if not _valid_email(email):
+        logger.warning("request_id=%s invalid email=%r", request_id, email)
+        return _bad_request("'email' must be a valid email address.")
 
     if wallet_type not in ("apple", "google"):
         logger.warning("request_id=%s invalid wallet_type=%r", request_id, wallet_type)
@@ -101,10 +107,10 @@ def create_pass(req: func.HttpRequest) -> func.HttpResponse:
     # Log the incoming request (audit trail)
     client_ip = req.headers.get("X-Forwarded-For") or req.headers.get("X-Real-IP")
     logger.info(
-        "request_id=%s member_number=%s wallet_type=%s expiry=%s ip=%s",
-        request_id, member_number, wallet_type, expiry_date, client_ip,
+        "request_id=%s member_number=%s email=%s wallet_type=%s expiry=%s ip=%s",
+        request_id, member_number, email, wallet_type, expiry_date, client_ip,
     )
-    db.log_pass_request(request_id, name, member_number, expiry_date, wallet_type, client_ip)
+    db.log_pass_request(request_id, name, email, member_number, expiry_date, wallet_type, client_ip)
 
     # Check whether a valid pass already exists for this member / wallet type
     existing = db.get_pass_by_member_number(member_number, wallet_type)
@@ -140,12 +146,12 @@ def create_pass(req: func.HttpRequest) -> func.HttpResponse:
         if wallet_type == "apple":
             result = _issue_apple_pass(
                 request_id, serial_number, authentication_token,
-                name, member_number, expiry_date
+                name, email, member_number, expiry_date
             )
         else:
             result = _issue_google_pass(
                 request_id, serial_number,
-                name, member_number, expiry_date
+                name, email, member_number, expiry_date
             )
     except Exception as exc:
         logger.exception(
@@ -168,11 +174,13 @@ def _issue_apple_pass(
     serial_number: str,
     authentication_token: str,
     name: str,
+    email: str,
     member_number: str,
     expiry_date: str,
 ) -> dict:
     pkpass_bytes = build_pkpass(
         name=name,
+        email=email,
         member_number=member_number,
         expiry_date=expiry_date,
         serial_number=serial_number,
@@ -185,6 +193,7 @@ def _issue_apple_pass(
         serial_number=serial_number,
         request_id=request_id,
         name=name,
+        email=email,
         member_number=member_number,
         expiry_date=expiry_date,
         wallet_type="apple",
@@ -198,11 +207,13 @@ def _issue_google_pass(
     request_id: str,
     serial_number: str,
     name: str,
+    email: str,
     member_number: str,
     expiry_date: str,
 ) -> dict:
     save_url = build_save_url(
         name=name,
+        email=email,
         member_number=member_number,
         expiry_date=expiry_date,
         serial_number=serial_number,
@@ -211,6 +222,7 @@ def _issue_google_pass(
         serial_number=serial_number,
         request_id=request_id,
         name=name,
+        email=email,
         member_number=member_number,
         expiry_date=expiry_date,
         wallet_type="google",
@@ -437,6 +449,11 @@ def _valid_date(date_str: str) -> bool:
         return True
     except ValueError:
         return False
+
+
+def _valid_email(email: str) -> bool:
+    at = email.find("@")
+    return at > 0 and "." in email[at + 1:] and not email.endswith(".")
 
 
 def _ok(data: dict) -> func.HttpResponse:
