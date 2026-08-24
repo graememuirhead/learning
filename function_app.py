@@ -116,26 +116,45 @@ def create_pass(req: func.HttpRequest) -> func.HttpResponse:
     existing = db.get_pass_by_member_number(member_number, wallet_type)
     if existing:
         old_serial = existing["RowKey"]
-        existing_expiry = existing.get("ExpiryDate", "")
+        name_changed = name != existing.get("Name", "")
+        email_changed = email != existing.get("Email", "")
+        expiry_changed = expiry_date != existing.get("ExpiryDate", "")
 
-        if expiry_date <= existing_expiry:
-            # Same or earlier expiry — conflict; do not issue a new pass
+        if not name_changed and not email_changed and not expiry_changed:
+            # Exact duplicate — nothing to do
             logger.info(
-                "request_id=%s member_number=%s already has active %s pass_id=%s expiry=%s",
-                request_id, member_number, wallet_type, old_serial, existing_expiry,
+                "request_id=%s member_number=%s already has identical active %s pass_id=%s",
+                request_id, member_number, wallet_type, old_serial,
             )
             db.update_request_status(request_id, "conflict", old_serial)
             return _conflict(
                 f"Member {member_number} already has an active pass on {wallet_type} "
-                f"(expires {existing_expiry}). "
+                f"(expires {existing.get('ExpiryDate', '')}). "
                 "To renew, submit a request with a later expiry date."
             )
 
-        # New expiry is later — renew: void the old pass and fall through to issue a new one
+        if not name_changed and email_changed and not expiry_changed:
+            # Only the email address changed — update in place, keep the existing pass
+            logger.info(
+                "request_id=%s updating email for pass_id=%s member_number=%s",
+                request_id, old_serial, member_number,
+            )
+            db.update_pass_email(old_serial, email)
+            db.update_request_status(request_id, "email_updated", old_serial)
+            return _ok(
+                {
+                    "pass_id": old_serial,
+                    "pass_url": existing["PassUrl"],
+                    "wallet_type": wallet_type,
+                    "note": "Email address updated. Your existing pass remains valid.",
+                }
+            )
+
+        # Name or expiry changed — void the old pass and issue a new one
         logger.info(
-            "request_id=%s renewing %s pass for member_number=%s: "
-            "voiding old pass_id=%s (expiry=%s), issuing new pass (expiry=%s)",
-            request_id, wallet_type, member_number, old_serial, existing_expiry, expiry_date,
+            "request_id=%s reissuing %s pass for member_number=%s: "
+            "voiding old pass_id=%s (name_changed=%s expiry_changed=%s), issuing new pass",
+            request_id, wallet_type, member_number, old_serial, name_changed, expiry_changed,
         )
         _expire_old_pass(old_serial, wallet_type)
 

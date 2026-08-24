@@ -179,6 +179,19 @@ def get_pass_by_member_number(member_number: str, wallet_type: str) -> Optional[
     return dict(entities[0])
 
 
+def update_pass_email(serial_number: str, email: str) -> None:
+    """Update the email address on an existing pass record."""
+    client = _table_client(TABLE_PASSES)
+    try:
+        entity = client.get_entity(PARTITION_KEY, serial_number)
+        entity["Email"] = email
+        entity["UpdatedAt"] = _now_iso()
+        client.update_entity(entity)
+        logger.info("Updated email for pass serial=%s", serial_number)
+    except ResourceNotFoundError:
+        logger.warning("Pass serial=%s not found when updating email.", serial_number)
+
+
 def void_issued_pass(serial_number: str) -> bool:
     """Mark a pass as voided (e.g. added to a second device)."""
     client = _table_client(TABLE_PASSES)
