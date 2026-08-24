@@ -14,6 +14,7 @@ The resulting .pkpass file is a ZIP archive containing:
 import hashlib
 import io
 import json
+import logging
 import zipfile
 from datetime import datetime, timezone
 from typing import Optional
@@ -24,6 +25,8 @@ from cryptography.hazmat.primitives.serialization import pkcs7
 from cryptography.hazmat.backends import default_backend
 
 from config.settings import Settings
+
+logger = logging.getLogger(__name__)
 
 
 # --------------------------------------------------------------------------- #
@@ -206,21 +209,48 @@ def _sign_manifest(manifest_bytes: bytes) -> bytes:
     wwdr_pem = Settings.get_apple_wwdr_pem()
     password = Settings.APPLE_KEY_PASSWORD.encode() if Settings.APPLE_KEY_PASSWORD else None
 
-    certificate = x509.load_pem_x509_certificate(cert_pem, default_backend())
-    private_key = serialization.load_pem_private_key(key_pem, password=password, backend=default_backend())
-    wwdr_cert = x509.load_pem_x509_certificate(wwdr_pem, default_backend())
+    try:
+        certificate = x509.load_pem_x509_certificate(cert_pem, default_backend())
+        logger.debug(
+            "Loaded pass cert: subject=%s issuer=%s not_after=%s",
+            certificate.subject.rfc4514_string(),
+            certificate.issuer.rfc4514_string(),
+            certificate.not_valid_after_utc,
+        )
+    except Exception as exc:
+        raise RuntimeError(f"Failed to load Apple pass certificate: {exc}") from exc
 
-    builder = (
-        pkcs7.PKCS7SignatureBuilder()
-        .set_data(manifest_bytes)
-        .add_signer(certificate, private_key, hashes.SHA256())
-        .add_certificate(wwdr_cert)
-    )
+    try:
+        private_key = serialization.load_pem_private_key(key_pem, password=password, backend=default_backend())
+    except Exception as exc:
+        raise RuntimeError(
+            f"Failed to load Apple pass private key "
+            f"(APPLE_KEY_PASSWORD set={bool(Settings.APPLE_KEY_PASSWORD)}): {exc}"
+        ) from exc
 
-    return builder.sign(
-        serialization.Encoding.DER,
-        [pkcs7.PKCS7Options.DetachedSignature],
-    )
+    try:
+        wwdr_cert = x509.load_pem_x509_certificate(wwdr_pem, default_backend())
+        logger.debug(
+            "Loaded WWDR cert: subject=%s not_after=%s",
+            wwdr_cert.subject.rfc4514_string(),
+            wwdr_cert.not_valid_after_utc,
+        )
+    except Exception as exc:
+        raise RuntimeError(f"Failed to load Apple WWDR certificate: {exc}") from exc
+
+    try:
+        builder = (
+            pkcs7.PKCS7SignatureBuilder()
+            .set_data(manifest_bytes)
+            .add_signer(certificate, private_key, hashes.SHA256())
+            .add_certificate(wwdr_cert)
+        )
+        return builder.sign(
+            serialization.Encoding.DER,
+            [pkcs7.PKCS7Options.DetachedSignature],
+        )
+    except Exception as exc:
+        raise RuntimeError(f"PKCS7 signing failed: {exc}") from exc
 
 
 def _zip_pass(
@@ -257,7 +287,8 @@ def _resize_image(image_bytes: bytes, size: tuple[int, int]) -> bytes:
         out = io.BytesIO()
         canvas.save(out, format="PNG")
         return out.getvalue()
-    except Exception:
+    except Exception as exc:
+        logger.warning("Image resize to %s failed, using original bytes: %s", size, exc)
         return image_bytes
 
 

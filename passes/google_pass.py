@@ -14,6 +14,7 @@ Requires:
 """
 
 import json
+import logging
 import time
 from datetime import datetime, timezone
 
@@ -21,6 +22,8 @@ import google.auth.crypt
 import google.auth.jwt
 
 from config.settings import Settings
+
+logger = logging.getLogger(__name__)
 
 
 GOOGLE_WALLET_SAVE_URL = "https://pay.google.com/gp/v/save"
@@ -94,8 +97,16 @@ def void_google_pass(serial_number: str) -> bool:
     patch_body = {"state": "EXPIRED"}
     try:
         resp = requests.patch(url, json=patch_body, headers=_auth_headers())
-        return resp.status_code in (200, 204)
+        if resp.status_code not in (200, 204):
+            logger.error(
+                "Google Wallet void failed serial=%s status=%d body=%s",
+                serial_number, resp.status_code, resp.text[:500],
+            )
+            return False
+        logger.info("Google Wallet pass voided serial=%s", serial_number)
+        return True
     except Exception:
+        logger.exception("Google Wallet void request raised an exception serial=%s", serial_number)
         return False
 
 

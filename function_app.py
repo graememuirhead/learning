@@ -69,10 +69,12 @@ def create_pass(req: func.HttpRequest) -> func.HttpResponse:
         wallet_type   – echoed back
     """
     request_id = str(uuid.uuid4())
+    logger.info("create-pass request_id=%s", request_id)
 
     try:
         body = req.get_json()
     except ValueError:
+        logger.warning("request_id=%s bad JSON body", request_id)
         return _bad_request("Request body must be valid JSON.")
 
     name = _str(body, "name")
@@ -82,21 +84,35 @@ def create_pass(req: func.HttpRequest) -> func.HttpResponse:
 
     # Validation
     if not all([name, member_number, expiry_date]):
+        logger.warning(
+            "request_id=%s missing required fields: name=%r member_number=%r expiry_date=%r",
+            request_id, bool(name), bool(member_number), bool(expiry_date),
+        )
         return _bad_request("Fields 'name', 'member_number', and 'expiry_date' are required.")
 
     if wallet_type not in ("apple", "google"):
+        logger.warning("request_id=%s invalid wallet_type=%r", request_id, wallet_type)
         return _bad_request("'wallet_type' must be 'apple' or 'google'.")
 
     if not _valid_date(expiry_date):
+        logger.warning("request_id=%s invalid expiry_date=%r", request_id, expiry_date)
         return _bad_request("'expiry_date' must be in YYYY-MM-DD format.")
 
     # Log the incoming request (audit trail)
     client_ip = req.headers.get("X-Forwarded-For") or req.headers.get("X-Real-IP")
+    logger.info(
+        "request_id=%s member_number=%s wallet_type=%s expiry=%s ip=%s",
+        request_id, member_number, wallet_type, expiry_date, client_ip,
+    )
     db.log_pass_request(request_id, name, member_number, expiry_date, wallet_type, client_ip)
 
     # Check whether a valid pass already exists for this member / wallet type
     existing = db.get_pass_by_member_number(member_number, wallet_type)
     if existing:
+        logger.info(
+            "request_id=%s returning existing pass_id=%s for member_number=%s",
+            request_id, existing["RowKey"], member_number,
+        )
         db.update_request_status(request_id, "existing", existing["RowKey"])
         return _ok(
             {
@@ -122,10 +138,17 @@ def create_pass(req: func.HttpRequest) -> func.HttpResponse:
                 name, member_number, expiry_date
             )
     except Exception as exc:
-        logger.exception("Failed to create pass for request %s", request_id)
+        logger.exception(
+            "request_id=%s failed to create %s pass for member_number=%s: %s",
+            request_id, wallet_type, member_number, exc,
+        )
         db.update_request_status(request_id, "error")
         return _internal_error(str(exc))
 
+    logger.info(
+        "request_id=%s issued %s pass_id=%s for member_number=%s",
+        request_id, wallet_type, serial_number, member_number,
+    )
     db.update_request_status(request_id, "issued", serial_number)
     return _ok(result)
 
@@ -197,12 +220,15 @@ def get_pass(req: func.HttpRequest) -> func.HttpResponse:
     For Google passes: redirect to the Google Wallet save URL.
     """
     pass_id = req.route_params.get("pass_id", "")
+    logger.info("get-pass pass_id=%s", pass_id)
 
     pass_record = db.get_issued_pass(pass_id)
     if not pass_record:
+        logger.warning("get-pass pass_id=%s not found in IssuedPasses table", pass_id)
         return func.HttpResponse("Pass not found.", status_code=404)
 
     if pass_record.get("Voided"):
+        logger.info("get-pass pass_id=%s is voided", pass_id)
         return func.HttpResponse(
             "This pass has been revoked. Please contact Rye Tri Club for a replacement.",
             status_code=410,
@@ -213,6 +239,7 @@ def get_pass(req: func.HttpRequest) -> func.HttpResponse:
     if wallet_type == "apple":
         pkpass_bytes = db.get_pkpass(pass_id)
         if not pkpass_bytes:
+            logger.error("get-pass pass_id=%s record exists in table but blob not found in storage", pass_id)
             return func.HttpResponse("Pass file not found.", status_code=404)
         return func.HttpResponse(
             pkpass_bytes,
@@ -264,7 +291,10 @@ def apple_register_device(
 
     registered = db.register_apple_device(device_id, push_token, serial)
     if not registered:
-        # Pass already registered to another device
+        logger.warning(
+            "apple-register serial=%s device=%s rejected (one-wallet policy)",
+            serial, device_id,
+        )
         return func.HttpResponse(
             json.dumps(
                 {
@@ -276,6 +306,7 @@ def apple_register_device(
             mimetype="application/json",
         )
 
+    logger.info("apple-register serial=%s device=%s registered", serial, device_id)
     return func.HttpResponse(status_code=201)
 
 

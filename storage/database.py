@@ -91,7 +91,14 @@ def log_pass_request(
         "RequestedAt": _now_iso(),
         "Status": "pending",
     }
-    _table_client(TABLE_REQUESTS).upsert_entity(entity)
+    try:
+        _table_client(TABLE_REQUESTS).upsert_entity(entity)
+    except Exception:
+        # Audit log failure must not block the API response
+        logger.exception(
+            "Failed to write audit log for request_id=%s member_number=%s",
+            request_id, member_number,
+        )
 
 
 def update_request_status(request_id: str, status: str, pass_id: Optional[str] = None) -> None:
@@ -294,7 +301,12 @@ def store_pkpass(serial_number: str, pkpass_bytes: bytes) -> None:
         container=Settings.STORAGE_CONTAINER_PASSES,
         blob=f"{serial_number}.pkpass",
     )
-    blob.upload_blob(pkpass_bytes, overwrite=True)
+    try:
+        blob.upload_blob(pkpass_bytes, overwrite=True)
+        logger.info("Stored pkpass blob serial=%s size=%d bytes", serial_number, len(pkpass_bytes))
+    except Exception:
+        logger.exception("Failed to upload pkpass blob serial=%s", serial_number)
+        raise
 
 
 def get_pkpass(serial_number: str) -> Optional[bytes]:
@@ -304,6 +316,12 @@ def get_pkpass(serial_number: str) -> Optional[bytes]:
         blob=f"{serial_number}.pkpass",
     )
     try:
-        return blob.download_blob().readall()
+        data = blob.download_blob().readall()
+        logger.debug("Retrieved pkpass blob serial=%s size=%d bytes", serial_number, len(data))
+        return data
     except ResourceNotFoundError:
+        logger.warning("pkpass blob not found in storage serial=%s", serial_number)
+        return None
+    except Exception:
+        logger.exception("Failed to download pkpass blob serial=%s", serial_number)
         return None
