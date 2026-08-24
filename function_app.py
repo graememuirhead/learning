@@ -109,19 +109,29 @@ def create_pass(req: func.HttpRequest) -> func.HttpResponse:
     # Check whether a valid pass already exists for this member / wallet type
     existing = db.get_pass_by_member_number(member_number, wallet_type)
     if existing:
+        old_serial = existing["RowKey"]
+        existing_expiry = existing.get("ExpiryDate", "")
+
+        if expiry_date <= existing_expiry:
+            # Same or earlier expiry — conflict; do not issue a new pass
+            logger.info(
+                "request_id=%s member_number=%s already has active %s pass_id=%s expiry=%s",
+                request_id, member_number, wallet_type, old_serial, existing_expiry,
+            )
+            db.update_request_status(request_id, "conflict", old_serial)
+            return _conflict(
+                f"Member {member_number} already has an active pass on {wallet_type} "
+                f"(expires {existing_expiry}). "
+                "To renew, submit a request with a later expiry date."
+            )
+
+        # New expiry is later — renew: void the old pass and fall through to issue a new one
         logger.info(
-            "request_id=%s returning existing pass_id=%s for member_number=%s",
-            request_id, existing["RowKey"], member_number,
+            "request_id=%s renewing %s pass for member_number=%s: "
+            "voiding old pass_id=%s (expiry=%s), issuing new pass (expiry=%s)",
+            request_id, wallet_type, member_number, old_serial, existing_expiry, expiry_date,
         )
-        db.update_request_status(request_id, "existing", existing["RowKey"])
-        return _ok(
-            {
-                "pass_id": existing["RowKey"],
-                "pass_url": existing["PassUrl"],
-                "wallet_type": wallet_type,
-                "note": "An active pass already exists for this member; returning existing URL.",
-            }
-        )
+        _expire_old_pass(old_serial, wallet_type)
 
     serial_number = str(uuid.uuid4())
     authentication_token = secrets.token_urlsafe(32)
@@ -207,6 +217,22 @@ def _issue_google_pass(
         pass_url=save_url,
     )
     return {"pass_id": serial_number, "pass_url": save_url, "wallet_type": "google"}
+
+
+def _expire_old_pass(serial_number: str, wallet_type: str) -> None:
+    """Void an existing pass in the database and, for Google passes, via the API."""
+    db.void_issued_pass(serial_number)
+    logger.info("Voided pass_id=%s wallet_type=%s in database", serial_number, wallet_type)
+
+    if wallet_type == "google":
+        from passes.google_pass import void_google_pass
+        ok = void_google_pass(serial_number)
+        if not ok:
+            logger.error(
+                "Google Wallet API void failed for pass_id=%s; "
+                "DB record is voided but the Google pass may still appear active",
+                serial_number,
+            )
 
 
 # =========================================================================== #
@@ -425,6 +451,14 @@ def _bad_request(message: str) -> func.HttpResponse:
     return func.HttpResponse(
         json.dumps({"error": message}),
         status_code=400,
+        mimetype="application/json",
+    )
+
+
+def _conflict(message: str) -> func.HttpResponse:
+    return func.HttpResponse(
+        json.dumps({"error": message}),
+        status_code=409,
         mimetype="application/json",
     )
 
