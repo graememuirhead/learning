@@ -37,6 +37,7 @@ jobs:
           ARM_CLIENT_SECRET:   ${{ secrets.AZURE_CLIENT_SECRET }}
           ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           ARM_TENANT_ID:       ${{ secrets.AZURE_TENANT_ID }}
+          ARM_ACCESS_KEY:      ${{ secrets.AZURE_TFSTATE_KEY }}
         run: terraform init
 
       - name: Terraform Plan
@@ -46,6 +47,7 @@ jobs:
           ARM_CLIENT_SECRET:   ${{ secrets.AZURE_CLIENT_SECRET }}
           ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           ARM_TENANT_ID:       ${{ secrets.AZURE_TENANT_ID }}
+          ARM_ACCESS_KEY:      ${{ secrets.AZURE_TFSTATE_KEY }}
           TF_VAR_apple_team_identifier:      ${{ secrets.APPLE_TEAM_IDENTIFIER }}
           TF_VAR_apple_pass_certificate_pem: ${{ secrets.APPLE_PASS_CERTIFICATE_PEM }}
           TF_VAR_apple_pass_key_pem:         ${{ secrets.APPLE_PASS_KEY_PEM }}
@@ -62,6 +64,7 @@ jobs:
           ARM_CLIENT_SECRET:   ${{ secrets.AZURE_CLIENT_SECRET }}
           ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           ARM_TENANT_ID:       ${{ secrets.AZURE_TENANT_ID }}
+          ARM_ACCESS_KEY:      ${{ secrets.AZURE_TFSTATE_KEY }}
           TF_VAR_apple_team_identifier:      ${{ secrets.APPLE_TEAM_IDENTIFIER }}
           TF_VAR_apple_pass_certificate_pem: ${{ secrets.APPLE_PASS_CERTIFICATE_PEM }}
           TF_VAR_apple_pass_key_pem:         ${{ secrets.APPLE_PASS_KEY_PEM }}
@@ -79,6 +82,7 @@ jobs:
           ARM_CLIENT_SECRET:   ${{ secrets.AZURE_CLIENT_SECRET }}
           ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           ARM_TENANT_ID:       ${{ secrets.AZURE_TENANT_ID }}
+          ARM_ACCESS_KEY:      ${{ secrets.AZURE_TFSTATE_KEY }}
         run: |
           echo "function_app_name=$(terraform output -raw function_app_name)" >> $GITHUB_OUTPUT
 

@@ -17,7 +17,6 @@ terraform {
     storage_account_name = "ryetritfstate"
     container_name       = "tfstate"
     key                  = "rye-tri.tfstate"
-    use_azuread_auth     = true
   }
 }
 
