@@ -17,7 +17,7 @@ variable "environment" {
 variable "location" {
   description = "Azure region to deploy into"
   type        = string
-  default     = "eastus"
+  default     = "centralus"
 }
 
 variable "apple_pass_type_identifier" {
