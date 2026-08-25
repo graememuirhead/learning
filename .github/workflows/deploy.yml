@@ -30,25 +30,6 @@ jobs:
           terraform_version: "~1.9"
           terraform_wrapper: false
 
-      - name: Inspect remote state blob
-        run: |
-          az storage blob download \
-            --account-name ryetritfstate \
-            --container-name tfstate \
-            --name rye-tri.tfstate \
-            --account-key "${{ secrets.AZURE_TFSTATE_KEY }}" \
-            --file /tmp/remote-state.json
-          echo "Blob size: $(wc -c < /tmp/remote-state.json) bytes"
-          echo "Managed resources in blob:"
-          python3 -c "
-import json
-s = json.load(open('/tmp/remote-state.json'))
-for r in s.get('resources', []):
-    if r.get('mode') == 'managed':
-        print('  ' + r['type'] + '.' + r['name'])
-print('Total managed:', sum(1 for r in s.get('resources',[]) if r.get('mode')=='managed'))
-          "
-
       - name: Terraform Init
         working-directory: ${{ env.TF_WORKING_DIR }}
         env:
@@ -60,18 +41,6 @@ print('Total managed:', sum(1 for r in s.get('resources',[]) if r.get('mode')=='
         run: |
           terraform init -reconfigure \
             -backend-config="access_key=${{ secrets.AZURE_TFSTATE_KEY }}"
-
-      - name: Show Terraform state
-        working-directory: ${{ env.TF_WORKING_DIR }}
-        env:
-          ARM_CLIENT_ID:       ${{ secrets.AZURE_CLIENT_ID }}
-          ARM_CLIENT_SECRET:   ${{ secrets.AZURE_CLIENT_SECRET }}
-          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          ARM_TENANT_ID:       ${{ secrets.AZURE_TENANT_ID }}
-          ARM_ACCESS_KEY:      ${{ secrets.AZURE_TFSTATE_KEY }}
-        run: |
-          echo "=== Resources in remote state ==="
-          terraform state list || echo "(empty — state not readable)"
 
       - name: Terraform Plan
         working-directory: ${{ env.TF_WORKING_DIR }}
