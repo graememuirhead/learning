@@ -30,6 +30,22 @@ jobs:
           terraform_version: "~1.9"
           terraform_wrapper: false
 
+      - name: Verify state file access
+        run: |
+          SIZE=$(az storage blob show \
+            --account-name ryetritfstate \
+            --container-name tfstate \
+            --name rye-tri.tfstate \
+            --account-key "${{ secrets.AZURE_TFSTATE_KEY }}" \
+            --query properties.contentLength \
+            -o tsv 2>&1)
+          echo "State file size: ${SIZE} bytes"
+          if [ -z "$SIZE" ] || echo "$SIZE" | grep -qi "error\|AuthenticationFailed\|BlobNotFound"; then
+            echo "ERROR: Cannot access state file — check AZURE_TFSTATE_KEY secret"
+            echo "$SIZE"
+            exit 1
+          fi
+
       - name: Terraform Init
         working-directory: ${{ env.TF_WORKING_DIR }}
         env:
@@ -38,7 +54,9 @@ jobs:
           ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           ARM_TENANT_ID:       ${{ secrets.AZURE_TENANT_ID }}
           ARM_ACCESS_KEY:      ${{ secrets.AZURE_TFSTATE_KEY }}
-        run: terraform init
+        run: |
+          terraform init \
+            -backend-config="access_key=${{ secrets.AZURE_TFSTATE_KEY }}"
 
       - name: Terraform Plan
         working-directory: ${{ env.TF_WORKING_DIR }}
