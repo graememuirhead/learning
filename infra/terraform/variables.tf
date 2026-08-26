@@ -29,8 +29,7 @@ variable "apple_pass_type_identifier" {
 variable "apple_team_identifier" {
   description = "10-character Apple Team ID"
   type        = string
-  default     = ""
-  sensitive   = true
+  default     = "YNAZR962LC"
 }
 
 variable "apple_pass_certificate_pem" {
