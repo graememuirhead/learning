@@ -159,6 +159,30 @@ def get_issued_pass(serial_number: str) -> Optional[dict]:
         return None
 
 
+def list_active_members() -> list[dict]:
+    """
+    Return one record per member with an active (non-voided) pass.
+    Deduplicates across wallet types — a member with both Apple and Google
+    passes appears only once.  Sorted by Name.
+    """
+    client = _table_client(TABLE_PASSES)
+    entities = client.query_entities(
+        f"PartitionKey eq '{PARTITION_KEY}' and Voided eq false",
+        select=["MemberNumber", "Name", "Email", "ExpiryDate"],
+    )
+    seen: dict[str, dict] = {}
+    for e in entities:
+        mn = e.get("MemberNumber", "")
+        if mn not in seen:
+            seen[mn] = {
+                "name": e.get("Name", ""),
+                "email": e.get("Email", ""),
+                "member_number": mn,
+                "expiry_date": e.get("ExpiryDate", ""),
+            }
+    return sorted(seen.values(), key=lambda r: r["name"].lower())
+
+
 def get_pass_by_member_number(member_number: str, wallet_type: str) -> Optional[dict]:
     """
     Look up an existing, non-voided pass for a given member number and wallet type.

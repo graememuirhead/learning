@@ -29,6 +29,8 @@ POST   /api/apple/log
 
 from __future__ import annotations
 
+import csv
+import io
 import json
 import logging
 import secrets
@@ -436,6 +438,33 @@ def apple_log(req: func.HttpRequest) -> func.HttpResponse:
     except Exception:
         pass
     return func.HttpResponse(status_code=200)
+
+
+# =========================================================================== #
+# GET /api/members  – admin CSV export of active members
+# =========================================================================== #
+
+@app.route(route="members", methods=["GET"])
+def get_members(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    Return a CSV of all currently active (non-voided) members.
+    Deduplicated by member number; sorted by name.
+    Requires a function key (?code=...).
+    """
+    members = db.list_active_members()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["name", "email", "member_number", "expiry_date"])
+    for m in members:
+        writer.writerow([m["name"], m["email"], m["member_number"], m["expiry_date"]])
+
+    return func.HttpResponse(
+        output.getvalue(),
+        status_code=200,
+        mimetype="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="members.csv"'},
+    )
 
 
 # =========================================================================== #
