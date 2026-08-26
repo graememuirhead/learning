@@ -118,6 +118,14 @@ def _build_pass_json(
         "expirationDate": expiration_iso,
         "voided": False,
         "generic": {
+            "headerFields": [
+                {
+                    "key": "club_name",
+                    "label": "",
+                    "value": "Rye Tri Club",
+                    "textAlignment": "PKTextAlignmentRight",
+                }
+            ],
             "primaryFields": [
                 {
                     "key": "member_name",
@@ -136,13 +144,6 @@ def _build_pass_json(
                     "label": "VALID THROUGH",
                     "value": expiry_date,
                     "textAlignment": "PKTextAlignmentRight",
-                },
-            ],
-            "auxiliaryFields": [
-                {
-                    "key": "club",
-                    "label": "CLUB",
-                    "value": "Rye Tri",
                 },
             ],
             "backFields": [
