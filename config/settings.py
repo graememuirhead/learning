@@ -60,7 +60,7 @@ class Settings:
         b64 = os.environ.get("APPLE_WWDR_CERTIFICATE_PEM", "")
         if b64:
             return base64.b64decode(b64)
-        wwdr_file = ASSETS_DIR / "AppleWWDRCAG3.pem"
+        wwdr_file = ASSETS_DIR / "AppleWWDRCAG4.pem"
         if wwdr_file.exists():
             return wwdr_file.read_bytes()
         raise RuntimeError(
