@@ -223,7 +223,7 @@ def _sign_manifest(manifest_bytes: bytes) -> bytes:
             "Loaded pass cert: subject=%s issuer=%s not_after=%s",
             certificate.subject.rfc4514_string(),
             certificate.issuer.rfc4514_string(),
-            certificate.not_valid_after_utc,
+            certificate.not_valid_after,
         )
     except Exception as exc:
         raise RuntimeError(f"Failed to load Apple pass certificate: {exc}") from exc
@@ -241,7 +241,7 @@ def _sign_manifest(manifest_bytes: bytes) -> bytes:
         logger.debug(
             "Loaded WWDR cert: subject=%s not_after=%s",
             wwdr_cert.subject.rfc4514_string(),
-            wwdr_cert.not_valid_after_utc,
+            wwdr_cert.not_valid_after,
         )
     except Exception as exc:
         raise RuntimeError(f"Failed to load Apple WWDR certificate: {exc}") from exc
