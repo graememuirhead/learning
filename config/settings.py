@@ -22,7 +22,7 @@ class Settings:
     APPLE_PASS_TYPE_IDENTIFIER: str = os.environ.get(
         "APPLE_PASS_TYPE_IDENTIFIER", "pass.com.ryetriclub.membership"
     )
-    APPLE_TEAM_IDENTIFIER: str = os.environ.get("APPLE_TEAM_IDENTIFIER", "")
+    APPLE_TEAM_IDENTIFIER: str = os.environ.get("APPLE_TEAM_IDENTIFIER", "YNAZR962LC")
     APPLE_KEY_PASSWORD: str = os.environ.get("APPLE_KEY_PASSWORD", "")
 
     @staticmethod
@@ -60,7 +60,7 @@ class Settings:
         b64 = os.environ.get("APPLE_WWDR_CERTIFICATE_PEM", "")
         if b64:
             return base64.b64decode(b64)
-        wwdr_file = ASSETS_DIR / "AppleWWDRCAG3.pem"
+        wwdr_file = ASSETS_DIR / "AppleWWDRCAG4.pem"
         if wwdr_file.exists():
             return wwdr_file.read_bytes()
         raise RuntimeError(

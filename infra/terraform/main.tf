@@ -123,8 +123,8 @@ resource "azurerm_linux_function_app" "main" {
     APPLE_TEAM_IDENTIFIER      = var.apple_team_identifier
     APPLE_PASS_CERTIFICATE_PEM = var.apple_pass_certificate_pem
     APPLE_PASS_KEY_PEM         = var.apple_pass_key_pem
-    APPLE_WWDR_CERTIFICATE_PEM = var.apple_wwdr_certificate_pem
     APPLE_KEY_PASSWORD         = var.apple_key_password
+    # APPLE_WWDR_CERTIFICATE_PEM intentionally omitted — G4 cert shipped in assets/
 
     # Google Wallet
     GOOGLE_ISSUER_ID            = var.google_issuer_id
