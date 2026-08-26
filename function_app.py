@@ -303,7 +303,6 @@ def get_pass(req: func.HttpRequest) -> func.HttpResponse:
             status_code=200,
             mimetype="application/vnd.apple.pkpass",
             headers={
-                "Content-Disposition": f'attachment; filename="{pass_id}.pkpass"',
                 "Cache-Control": "no-cache, no-store, must-revalidate",
             },
         )
