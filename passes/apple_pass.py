@@ -15,13 +15,14 @@ import hashlib
 import io
 import json
 import logging
+import os
+import subprocess
+import tempfile
 import zipfile
 from datetime import datetime, timezone
 from typing import Optional
 
 from cryptography import x509
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.serialization import pkcs7
 from cryptography.hazmat.backends import default_backend
 
 from config.settings import Settings
@@ -209,56 +210,52 @@ def _build_manifest(files: dict[str, bytes]) -> dict:
 
 def _sign_manifest(manifest_bytes: bytes) -> bytes:
     """
-    Create a detached PKCS7 / CMS signature over manifest_bytes.
-    This is the 'signature' file required by Apple.
+    Create a detached PKCS7 signature over manifest_bytes using openssl smime.
+    This produces the exact format Apple Wallet requires.
     """
     cert_pem = Settings.get_apple_cert_pem()
     key_pem = Settings.get_apple_key_pem()
     wwdr_pem = Settings.get_apple_wwdr_pem()
-    password = Settings.APPLE_KEY_PASSWORD.encode() if Settings.APPLE_KEY_PASSWORD else None
+    password = Settings.APPLE_KEY_PASSWORD
 
-    try:
-        certificate = x509.load_pem_x509_certificate(cert_pem, default_backend())
-        logger.debug(
-            "Loaded pass cert: subject=%s issuer=%s not_after=%s",
-            certificate.subject.rfc4514_string(),
-            certificate.issuer.rfc4514_string(),
-            certificate.not_valid_after,
-        )
-    except Exception as exc:
-        raise RuntimeError(f"Failed to load Apple pass certificate: {exc}") from exc
+    with tempfile.TemporaryDirectory() as tmpdir:
+        cert_file = os.path.join(tmpdir, "cert.pem")
+        key_file = os.path.join(tmpdir, "key.pem")
+        wwdr_file = os.path.join(tmpdir, "wwdr.pem")
+        manifest_file = os.path.join(tmpdir, "manifest.json")
 
-    try:
-        private_key = serialization.load_pem_private_key(key_pem, password=password, backend=default_backend())
-    except Exception as exc:
-        raise RuntimeError(
-            f"Failed to load Apple pass private key "
-            f"(APPLE_KEY_PASSWORD set={bool(Settings.APPLE_KEY_PASSWORD)}): {exc}"
-        ) from exc
+        with open(cert_file, "wb") as f:
+            f.write(cert_pem)
+        with open(key_file, "wb") as f:
+            f.write(key_pem)
+        with open(wwdr_file, "wb") as f:
+            f.write(wwdr_pem)
+        with open(manifest_file, "wb") as f:
+            f.write(manifest_bytes)
 
-    try:
-        wwdr_cert = x509.load_pem_x509_certificate(wwdr_pem, default_backend())
-        logger.debug(
-            "Loaded WWDR cert: subject=%s not_after=%s",
-            wwdr_cert.subject.rfc4514_string(),
-            wwdr_cert.not_valid_after,
-        )
-    except Exception as exc:
-        raise RuntimeError(f"Failed to load Apple WWDR certificate: {exc}") from exc
+        cmd = [
+            "openssl", "smime", "-binary", "-sign",
+            "-certfile", wwdr_file,
+            "-signer", cert_file,
+            "-inkey", key_file,
+            "-in", manifest_file,
+            "-outform", "DER",
+        ]
+        if password:
+            cmd += ["-passin", f"pass:{password}"]
 
-    try:
-        builder = (
-            pkcs7.PKCS7SignatureBuilder()
-            .set_data(manifest_bytes)
-            .add_signer(certificate, private_key, hashes.SHA256())
-            .add_certificate(wwdr_cert)
-        )
-        return builder.sign(
-            serialization.Encoding.DER,
-            [pkcs7.PKCS7Options.DetachedSignature],
-        )
-    except Exception as exc:
-        raise RuntimeError(f"PKCS7 signing failed: {exc}") from exc
+        try:
+            result = subprocess.run(cmd, capture_output=True, timeout=30)
+        except FileNotFoundError:
+            raise RuntimeError("openssl not found — cannot sign pass")
+        except subprocess.TimeoutExpired:
+            raise RuntimeError("openssl signing timed out")
+
+        if result.returncode != 0:
+            raise RuntimeError(f"PKCS7 signing failed: {result.stderr.decode(errors='replace')}")
+
+        logger.debug("PKCS7 signature generated (%d bytes)", len(result.stdout))
+        return result.stdout
 
 
 def _zip_pass(
