@@ -113,6 +113,7 @@ def _build_pass_json(
         "webServiceURL": f"{Settings.BASE_URL}/apple",
         "authenticationToken": authentication_token,
         "organizationName": "Rye Tri Club",
+        "logoText": "",
         "description": "Rye Tri Club Membership Card",
         "expirationDate": expiration_iso,
         "voided": False,
@@ -142,11 +143,6 @@ def _build_pass_json(
                     "key": "club",
                     "label": "CLUB",
                     "value": "Rye Tri",
-                },
-                {
-                    "key": "location",
-                    "label": "LOCATION",
-                    "value": "Rye, NY",
                 },
             ],
             "backFields": [
@@ -191,10 +187,9 @@ def _build_pass_json(
                 "altText": f"Member #{member_number}",
             }
         ],
-        # Rye Tri colours: navy + gold
-        "backgroundColor": "rgb(10, 36, 99)",
-        "foregroundColor": "rgb(255, 255, 255)",
-        "labelColor": "rgb(255, 198, 0)",
+        "backgroundColor": "rgb(255, 255, 255)",
+        "foregroundColor": "rgb(10, 36, 99)",
+        "labelColor": "rgb(120, 120, 120)",
     }
 
     return json.dumps(pass_data, indent=2)
