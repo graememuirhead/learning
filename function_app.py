@@ -270,7 +270,7 @@ def _expire_old_pass(serial_number: str, wallet_type: str) -> None:
 # GET /api/pass/{pass_id}
 # =========================================================================== #
 
-@app.route(route="pass/{pass_id}", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
+@app.route(route="pass/{pass_id}", methods=["GET", "HEAD"], auth_level=func.AuthLevel.ANONYMOUS)
 def get_pass(req: func.HttpRequest) -> func.HttpResponse:
     """
     For Apple passes: stream the .pkpass binary so the user can tap "Add to Wallet".
