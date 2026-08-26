@@ -86,6 +86,9 @@ class Settings:
             "Set GOOGLE_SERVICE_ACCOUNT_JSON env var or place google_service_account.json in assets/."
         )
 
+    # ---- Environment ----
+    IS_DEV: bool = os.environ.get("ENVIRONMENT", "prod").lower() == "dev"
+
     # ---- Logo ----
     LOGO_FILENAME: str = os.environ.get("LOGO_FILENAME", "logo.png")
 

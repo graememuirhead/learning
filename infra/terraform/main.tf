@@ -116,7 +116,8 @@ resource "azurerm_linux_function_app" "main" {
     STORAGE_CONTAINER_PASSES  = "passes"
 
     # API base URL
-    BASE_URL = local.base_url
+    BASE_URL    = local.base_url
+    ENVIRONMENT = var.environment
 
     # Apple Wallet
     APPLE_PASS_TYPE_IDENTIFIER = var.apple_pass_type_identifier

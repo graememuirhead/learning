@@ -211,7 +211,7 @@ def _build_generic_object(
         "subheader": {
             "defaultValue": {
                 "language": "en-US",
-                "value": "Membership Card",
+                "value": "TEST ONLY" if Settings.IS_DEV else "Membership Card",
             }
         },
         "header": {
