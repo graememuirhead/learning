@@ -59,6 +59,8 @@ jobs:
           TF_VAR_apple_key_password:         ${{ secrets.APPLE_KEY_PASSWORD }}
           TF_VAR_google_issuer_id:            ${{ secrets.GOOGLE_ISSUER_ID }}
           TF_VAR_google_service_account_json: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          TF_VAR_sendgrid_api_key:            ${{ secrets.SENDGRID_API_KEY }}
+          TF_VAR_wild_apricot_webhook_secret: ${{ secrets.WILD_APRICOT_WEBHOOK_SECRET }}
         run: terraform plan -out=tfplan
 
       - name: Terraform Apply
@@ -78,6 +80,8 @@ jobs:
           TF_VAR_apple_key_password:         ${{ secrets.APPLE_KEY_PASSWORD }}
           TF_VAR_google_issuer_id:            ${{ secrets.GOOGLE_ISSUER_ID }}
           TF_VAR_google_service_account_json: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          TF_VAR_sendgrid_api_key:            ${{ secrets.SENDGRID_API_KEY }}
+          TF_VAR_wild_apricot_webhook_secret: ${{ secrets.WILD_APRICOT_WEBHOOK_SECRET }}
         run: terraform apply -auto-approve tfplan
 
       - name: Get Terraform Outputs

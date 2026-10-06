@@ -134,6 +134,11 @@ resource "azurerm_linux_function_app" "main" {
 
     # Logo
     LOGO_FILENAME = var.logo_filename
+
+    # Notifications
+    SENDGRID_API_KEY            = var.sendgrid_api_key
+    FROM_EMAIL                  = var.from_email
+    WILD_APRICOT_WEBHOOK_SECRET = var.wild_apricot_webhook_secret
   }
 }
 
