@@ -1,0 +1,4 @@
+// Copy to Config.xcconfig (git-ignored) and fill in.
+// xcconfig treats "//" as a comment, so write the URL as https:/$()/...
+GUIDE_API_URL = https:/$()/your-function-app.azurewebsites.net
+GUIDE_API_KEY = your-function-key

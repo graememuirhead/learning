@@ -1,0 +1,9 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+    "ANTHROPIC_API_KEY": "sk-ant-...",
+    "CLAUDE_MODEL": "claude-opus-5-5"
+  }
+}
