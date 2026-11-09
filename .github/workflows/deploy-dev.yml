@@ -26,13 +26,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install test dependencies
-        run: |
-          pip install -r requirements.txt -r requirements-test.txt \
-            --platform manylinux_2_17_x86_64 \
-            --python-version 311 \
-            --only-binary=:all: \
-            -t .test_packages 2>/dev/null || \
-          pip install -r requirements.txt -r requirements-test.txt
+        run: pip install -r requirements.txt -r requirements-test.txt
 
       - name: Run unit tests
         run: pytest tests/unit/ -v

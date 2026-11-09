@@ -131,10 +131,19 @@ def create_pass(req: func.HttpRequest) -> func.HttpResponse:
                 request_id, member_number, wallet_type, old_serial,
             )
             db.update_request_status(request_id, "conflict", old_serial)
-            return _conflict(
-                f"Member {member_number} already has an active pass on {wallet_type} "
-                f"(expires {existing.get('ExpiryDate', '')}). "
-                "To renew, submit a request with a later expiry date."
+            return func.HttpResponse(
+                json.dumps({
+                    "error": (
+                        f"Member {member_number} already has an active pass on {wallet_type} "
+                        f"(expires {existing.get('ExpiryDate', '')}). "
+                        "To renew, submit a request with a later expiry date."
+                    ),
+                    "pass_id": old_serial,
+                    "pass_url": existing["PassUrl"],
+                    "wallet_type": wallet_type,
+                }),
+                status_code=409,
+                mimetype="application/json",
             )
 
         if not name_changed and email_changed and not expiry_changed:
