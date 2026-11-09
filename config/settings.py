@@ -86,6 +86,16 @@ class Settings:
             "Set GOOGLE_SERVICE_ACCOUNT_JSON env var or place google_service_account.json in assets/."
         )
 
+    # ---- Environment ----
+    IS_DEV: bool = os.environ.get("ENVIRONMENT", "prod").lower() == "dev"
+
+    # ---- Notifications ----
+    SENDGRID_API_KEY: str = os.environ.get("SENDGRID_API_KEY", "")
+    FROM_EMAIL: str = os.environ.get("FROM_EMAIL", "membership@ryetriclub.com")
+
+    # ---- Wild Apricot webhook ----
+    WILD_APRICOT_WEBHOOK_SECRET: str = os.environ.get("WILD_APRICOT_WEBHOOK_SECRET", "")
+
     # ---- Logo ----
     LOGO_FILENAME: str = os.environ.get("LOGO_FILENAME", "logo.png")
 

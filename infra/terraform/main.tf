@@ -36,6 +36,11 @@ resource "azurerm_storage_account" "main" {
   min_tls_version          = "TLS1_2"
   allow_nested_items_to_be_public = false
   https_traffic_only_enabled      = true
+
+  static_website {
+    index_document     = "index.html"
+    error_404_document = "index.html"
+  }
 }
 
 resource "azurerm_storage_container" "passes" {
@@ -104,6 +109,10 @@ resource "azurerm_linux_function_app" "main" {
     }
     application_insights_key               = azurerm_application_insights.main.instrumentation_key
     application_insights_connection_string = azurerm_application_insights.main.connection_string
+    cors {
+      allowed_origins     = ["*"]
+      support_credentials = false
+    }
   }
 
   app_settings = {
@@ -116,7 +125,8 @@ resource "azurerm_linux_function_app" "main" {
     STORAGE_CONTAINER_PASSES  = "passes"
 
     # API base URL
-    BASE_URL = local.base_url
+    BASE_URL    = local.base_url
+    ENVIRONMENT = var.environment
 
     # Apple Wallet
     APPLE_PASS_TYPE_IDENTIFIER = var.apple_pass_type_identifier
@@ -133,6 +143,11 @@ resource "azurerm_linux_function_app" "main" {
 
     # Logo
     LOGO_FILENAME = var.logo_filename
+
+    # Notifications
+    SENDGRID_API_KEY            = var.sendgrid_api_key
+    FROM_EMAIL                  = var.from_email
+    WILD_APRICOT_WEBHOOK_SECRET = var.wild_apricot_webhook_secret
   }
 }
 

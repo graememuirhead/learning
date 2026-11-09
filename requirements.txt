@@ -9,3 +9,4 @@ google-api-python-client==2.164.0
 Pillow==11.1.0
 requests==2.32.3
 qrcode==8.1
+sendgrid==6.11.0

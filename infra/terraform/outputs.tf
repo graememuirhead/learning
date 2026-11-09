@@ -23,6 +23,11 @@ output "key_vault_name" {
   value       = azurerm_key_vault.main.name
 }
 
+output "static_website_url" {
+  description = "URL of the membership card reissue page"
+  value       = azurerm_storage_account.main.primary_web_endpoint
+}
+
 output "storage_connection_string" {
   description = "Storage account connection string"
   value       = azurerm_storage_account.main.primary_connection_string

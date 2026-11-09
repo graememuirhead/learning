@@ -113,7 +113,7 @@ def _build_pass_json(
         "webServiceURL": f"{Settings.BASE_URL}/apple",
         "authenticationToken": authentication_token,
         "organizationName": "Rye Tri Club",
-        "logoText": "",
+        "logoText": "TEST ONLY" if Settings.IS_DEV else "",
         "description": "Rye Tri Club Membership Card",
         "expirationDate": expiration_iso,
         "voided": False,

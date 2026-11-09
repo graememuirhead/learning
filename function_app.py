@@ -29,6 +29,8 @@ POST   /api/apple/log
 
 from __future__ import annotations
 
+import csv
+import io
 import json
 import logging
 import secrets
@@ -42,6 +44,8 @@ from config.settings import Settings
 from passes.apple_pass import build_pkpass
 from passes.google_pass import build_save_url
 from storage import database as db
+
+from notifications.email import send_welcome_email
 
 logger = logging.getLogger(__name__)
 
@@ -436,6 +440,234 @@ def apple_log(req: func.HttpRequest) -> func.HttpResponse:
     except Exception:
         pass
     return func.HttpResponse(status_code=200)
+
+
+# =========================================================================== #
+# POST /api/webhook/wild-apricot  – new member / renewal trigger
+# =========================================================================== #
+
+@app.route(route="webhook/wild-apricot", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+def wild_apricot_webhook(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    Receive Wild Apricot membership events and issue wallet passes.
+
+    Security: shared secret passed as ?secret=... in the webhook URL.
+    Configure Wild Apricot to POST to:
+      https://<func>.azurewebsites.net/api/webhook/wild-apricot?secret=<WILD_APRICOT_WEBHOOK_SECRET>
+
+    Events handled:
+      MembershipActivated  – new member joins
+      MembershipRenewed    – existing member renews (reissues pass with new expiry)
+    """
+    # Verify shared secret
+    provided = req.params.get("secret", "")
+    expected = Settings.WILD_APRICOT_WEBHOOK_SECRET
+    if not expected or not secrets.compare_digest(provided, expected):
+        logger.warning("wild-apricot-webhook: rejected unauthorised request")
+        return func.HttpResponse(status_code=401)
+
+    try:
+        body = req.get_json()
+    except ValueError:
+        return func.HttpResponse("Invalid JSON", status_code=400)
+
+    event_type = body.get("EventType", "")
+    logger.info("wild-apricot-webhook event_type=%s", event_type)
+
+    if event_type not in ("MembershipActivated", "MembershipRenewed"):
+        # Acknowledge silently — we don't process other event types
+        return func.HttpResponse(status_code=200)
+
+    # Wild Apricot payload: { EventType, AccountId, Parameters: { Contact: {...} } }
+    params = body.get("Parameters", {})
+    contact = params.get("Contact", {})
+
+    first_name = (contact.get("FirstName") or "").strip()
+    last_name = (contact.get("LastName") or "").strip()
+    name = f"{first_name} {last_name}".strip()
+    email = (contact.get("Email") or "").strip().lower()
+    member_number = str(contact.get("Id") or "")
+
+    # RenewalDue is ISO 8601 datetime — take just the date part
+    renewal_due = (contact.get("RenewalDue") or "")
+    expiry_date = renewal_due[:10] if renewal_due else ""
+
+    if not all([name, email, member_number, expiry_date]):
+        logger.error(
+            "wild-apricot-webhook: missing fields name=%r email=%r "
+            "member_number=%r expiry=%r — raw payload logged at DEBUG",
+            bool(name), bool(email), bool(member_number), bool(expiry_date),
+        )
+        logger.debug("wild-apricot-webhook raw payload: %s", json.dumps(body)[:2000])
+        return func.HttpResponse("Missing required member fields", status_code=422)
+
+    logger.info(
+        "wild-apricot-webhook member=%s email=%s expiry=%s event=%s",
+        member_number, email, expiry_date, event_type,
+    )
+
+    request_id = str(uuid.uuid4())
+    apple_pass_url: Optional[str] = None
+    google_save_url: Optional[str] = None
+
+    for wallet_type in ("apple", "google"):
+        try:
+            existing = db.get_pass_by_member_number(member_number, wallet_type)
+            if existing:
+                expiry_changed = expiry_date != existing.get("ExpiryDate", "")
+                email_changed = email != existing.get("Email", "")
+                if not expiry_changed and not email_changed:
+                    # Nothing changed — reuse the existing pass URL
+                    url = existing["PassUrl"]
+                    logger.info("wild-apricot-webhook %s pass unchanged pass_id=%s", wallet_type, existing["RowKey"])
+                elif not expiry_changed and email_changed:
+                    db.update_pass_email(existing["RowKey"], email)
+                    url = existing["PassUrl"]
+                    logger.info("wild-apricot-webhook %s pass email updated pass_id=%s", wallet_type, existing["RowKey"])
+                else:
+                    _expire_old_pass(existing["RowKey"], wallet_type)
+                    url = _issue_new_pass(request_id, wallet_type, name, email, member_number, expiry_date)
+            else:
+                url = _issue_new_pass(request_id, wallet_type, name, email, member_number, expiry_date)
+
+            if wallet_type == "apple":
+                apple_pass_url = url
+            else:
+                google_save_url = url
+
+        except Exception:
+            logger.exception(
+                "wild-apricot-webhook failed to issue %s pass for member=%s",
+                wallet_type, member_number,
+            )
+
+    if apple_pass_url or google_save_url:
+        send_welcome_email(name, email, member_number, expiry_date, apple_pass_url, google_save_url)
+    else:
+        logger.error(
+            "wild-apricot-webhook: both pass types failed for member=%s — no email sent",
+            member_number,
+        )
+
+    return func.HttpResponse(status_code=200)
+
+
+def _issue_new_pass(
+    request_id: str,
+    wallet_type: str,
+    name: str,
+    email: str,
+    member_number: str,
+    expiry_date: str,
+) -> str:
+    """Issue a brand-new pass and return its URL."""
+    serial_number = str(uuid.uuid4())
+    if wallet_type == "apple":
+        authentication_token = secrets.token_urlsafe(32)
+        result = _issue_apple_pass(
+            request_id, serial_number, authentication_token,
+            name, email, member_number, expiry_date,
+        )
+    else:
+        result = _issue_google_pass(
+            request_id, serial_number,
+            name, email, member_number, expiry_date,
+        )
+    return result["pass_url"]
+
+
+# =========================================================================== #
+# POST /api/reissue-pass  – self-service pass reissue
+# =========================================================================== #
+
+@app.route(route="reissue-pass", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+def reissue_pass(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    Self-service endpoint: member supplies their membership number and email.
+    If both match a record, their existing passes are voided and new ones issued.
+    A welcome email is sent with the new wallet links.
+    """
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _bad_request("Request body must be valid JSON.")
+
+    member_number = _str(body, "member_number")
+    email = _str(body, "email").lower()
+
+    if not member_number or not email:
+        return _bad_request("'member_number' and 'email' are required.")
+
+    # Look up existing passes — need at least one to verify membership
+    apple_pass = db.get_pass_by_member_number(member_number, "apple")
+    google_pass = db.get_pass_by_member_number(member_number, "google")
+    existing = apple_pass or google_pass
+
+    if not existing or existing.get("Email", "").lower() != email:
+        # Deliberately vague — don't reveal whether the member number exists
+        return func.HttpResponse(
+            json.dumps({"error": "No membership found for that number and email combination."}),
+            status_code=404,
+            mimetype="application/json",
+        )
+
+    name = existing.get("Name", "")
+    expiry_date = existing.get("ExpiryDate", "")
+    request_id = str(uuid.uuid4())
+
+    logger.info("reissue-pass member=%s email=%s", member_number, email)
+
+    # Void all existing passes
+    for wallet_type, pass_record in [("apple", apple_pass), ("google", google_pass)]:
+        if pass_record:
+            _expire_old_pass(pass_record["RowKey"], wallet_type)
+
+    apple_pass_url: Optional[str] = None
+    google_save_url: Optional[str] = None
+
+    if apple_pass:
+        try:
+            apple_pass_url = _issue_new_pass(request_id, "apple", name, email, member_number, expiry_date)
+        except Exception:
+            logger.exception("reissue-pass: apple pass failed for member=%s", member_number)
+
+    if google_pass:
+        try:
+            google_save_url = _issue_new_pass(request_id, "google", name, email, member_number, expiry_date)
+        except Exception:
+            logger.exception("reissue-pass: google pass failed for member=%s", member_number)
+
+    if apple_pass_url or google_save_url:
+        send_welcome_email(name, email, member_number, expiry_date, apple_pass_url, google_save_url)
+
+    return _ok({"message": "Your membership card has been reissued. Check your email for the new link."})
+
+
+# =========================================================================== #
+# GET /api/members  – admin CSV export of active members
+# =========================================================================== #
+
+@app.route(route="members", methods=["GET"])
+def get_members(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    Return a CSV of all currently active (non-voided) members.
+    Deduplicated by member number; sorted by name.
+    Requires a function key (?code=...).
+    """
+    members = db.list_active_members()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["name", "email", "member_number", "expiry_date"])
+    for m in members:
+        writer.writerow([m["name"], m["email"], m["member_number"], m["expiry_date"]])
+
+    return func.HttpResponse(
+        output.getvalue(),
+        status_code=200,
+        mimetype="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="members.csv"'},
+    )
 
 
 # =========================================================================== #

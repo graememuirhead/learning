@@ -80,6 +80,26 @@ variable "google_service_account_json" {
   sensitive   = true
 }
 
+variable "sendgrid_api_key" {
+  description = "SendGrid API key for sending welcome emails"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "wild_apricot_webhook_secret" {
+  description = "Shared secret appended to the Wild Apricot webhook URL"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "from_email" {
+  description = "Sender address for welcome emails"
+  type        = string
+  default     = "membership@ryetriclub.com"
+}
+
 variable "logo_filename" {
   description = "Logo filename in the assets/ directory"
   type        = string
