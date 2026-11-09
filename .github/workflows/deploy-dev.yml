@@ -237,11 +237,10 @@ jobs:
 
       - name: Get dev function app key and storage connection string
         run: |
-          RG=$(az functionapp show \
-            --name "${{ needs.infrastructure.outputs.function_app_name }}" \
-            --query resourceGroup -o tsv)
+          FUNC_APP="${{ needs.infrastructure.outputs.function_app_name }}"
+          RG="${FUNC_APP%-func}-rg"
           KEY=$(az functionapp keys list \
-            --name "${{ needs.infrastructure.outputs.function_app_name }}" \
+            --name "$FUNC_APP" \
             --resource-group "$RG" \
             --query 'functionKeys.default' -o tsv)
           CONN=$(az storage account show-connection-string \
