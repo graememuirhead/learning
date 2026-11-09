@@ -18,7 +18,9 @@ jobs:
     name: Terraform (dev)
     runs-on: ubuntu-latest
     outputs:
-      function_app_name: ${{ steps.tf_output.outputs.function_app_name }}
+      function_app_name:    ${{ steps.tf_output.outputs.function_app_name }}
+      storage_account_name: ${{ steps.tf_output.outputs.storage_account_name }}
+      static_website_url:   ${{ steps.tf_output.outputs.static_website_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -96,6 +98,8 @@ jobs:
           ARM_ACCESS_KEY:      ${{ secrets.AZURE_TFSTATE_KEY }}
         run: |
           echo "function_app_name=$(terraform output -raw function_app_name)" >> $GITHUB_OUTPUT
+          echo "storage_account_name=$(terraform output -raw storage_account_name)" >> $GITHUB_OUTPUT
+          echo "static_website_url=$(terraform output -raw static_website_url)" >> $GITHUB_OUTPUT
 
   # --------------------------------------------------------------------------
   # Build & deploy the Function App (dev)
@@ -140,3 +144,45 @@ jobs:
       - name: Print deployment URL
         run: |
           echo "Dev API: https://${{ needs.infrastructure.outputs.function_app_name }}.azurewebsites.net/api"
+
+  # --------------------------------------------------------------------------
+  # Deploy static website (reissue page) — dev
+  # --------------------------------------------------------------------------
+  deploy_static:
+    name: Deploy Static Website (dev)
+    runs-on: ubuntu-latest
+    needs: infrastructure
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure CLI Login
+        run: |
+          az login --service-principal \
+            --username ${{ secrets.AZURE_CLIENT_ID }} \
+            --password ${{ secrets.AZURE_CLIENT_SECRET }} \
+            --tenant ${{ secrets.AZURE_TENANT_ID }}
+          az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Upload reissue page and logo
+        run: |
+          STORAGE="${{ needs.infrastructure.outputs.storage_account_name }}"
+          FUNC_APP="${{ needs.infrastructure.outputs.function_app_name }}"
+          API_URL="https://${FUNC_APP}.azurewebsites.net/api"
+
+          sed "s|__API_BASE_URL__|${API_URL}|g" static/index.html > /tmp/index.html
+
+          ACCOUNT_KEY=$(az storage account keys list \
+            --account-name "$STORAGE" \
+            --query '[0].value' -o tsv)
+
+          az storage blob upload \
+            --account-name "$STORAGE" --account-key "$ACCOUNT_KEY" \
+            --container-name '$web' --name index.html \
+            --file /tmp/index.html --content-type text/html --overwrite
+
+          az storage blob upload \
+            --account-name "$STORAGE" --account-key "$ACCOUNT_KEY" \
+            --container-name '$web' --name logo.png \
+            --file assets/logo.png --content-type image/png --overwrite
+
+          echo "Dev reissue page: ${{ needs.infrastructure.outputs.static_website_url }}"

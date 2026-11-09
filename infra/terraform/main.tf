@@ -36,6 +36,11 @@ resource "azurerm_storage_account" "main" {
   min_tls_version          = "TLS1_2"
   allow_nested_items_to_be_public = false
   https_traffic_only_enabled      = true
+
+  static_website {
+    index_document     = "index.html"
+    error_404_document = "index.html"
+  }
 }
 
 resource "azurerm_storage_container" "passes" {

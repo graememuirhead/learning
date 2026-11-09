@@ -1,0 +1,292 @@
+<title>Rye Tri Club Card Reissue</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+
+<style>
+  :root {
+    --navy:   #0a2463;
+    --navy-2: #0d2d78;
+    --accent: #2563eb;
+    --bg:     #f1f4f9;
+    --card:   #ffffff;
+    --border: #dde3ee;
+    --label:  #64748b;
+    --text:   #1e293b;
+    --muted:  #94a3b8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:     #0f1623;
+      --card:   #1a2235;
+      --border: #2a3650;
+      --label:  #7a8fa8;
+      --text:   #e2e8f0;
+      --muted:  #4a5a72;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:     #0f1623;
+    --card:   #1a2235;
+    --border: #2a3650;
+    --label:  #7a8fa8;
+    --text:   #e2e8f0;
+    --muted:  #4a5a72;
+    color-scheme: dark;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding-block: 32px;
+    padding-left:  max(16px, env(safe-area-inset-left,  0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+
+  .card {
+    width: 100%;
+    max-width: 420px;
+    background: var(--card);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 4px 24px rgba(10, 36, 99, 0.10);
+  }
+
+  .header {
+    background: var(--navy);
+    padding: 28px 28px 24px;
+    text-align: center;
+  }
+  .logo {
+    display: block;
+    margin: 0 auto 14px;
+    height: 64px;
+    width: auto;
+    max-width: 240px;
+    object-fit: contain;
+  }
+  .header h1 {
+    color: #fff;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+  .header p {
+    color: #8fa8d8;
+    font-size: 13px;
+    margin-top: 4px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+
+  .body { padding: 28px; }
+
+  .intro {
+    font-size: 14px;
+    color: var(--label);
+    line-height: 1.6;
+    margin-bottom: 24px;
+  }
+
+  .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+  .field label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--label);
+  }
+  .field input {
+    width: 100%;
+    padding: 11px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    font-size: 15px;
+    font-family: inherit;
+    background: var(--card);
+    color: var(--text);
+    transition: border-color 0.15s;
+    outline: none;
+  }
+  .field input:focus { border-color: var(--accent); }
+  .field input::placeholder { color: var(--muted); }
+
+  .btn {
+    width: 100%;
+    margin-top: 8px;
+    padding: 13px;
+    background: var(--navy);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.15s, opacity 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .btn:hover { background: var(--navy-2); }
+  .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+  .spinner {
+    width: 16px; height: 16px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .alert {
+    display: flex;
+    gap: 12px;
+    padding: 14px;
+    border-radius: 8px;
+    font-size: 14px;
+    line-height: 1.5;
+    margin-top: 16px;
+  }
+  .alert-ok  { background: #f0fdf4; color: #15803d; border: 1.5px solid #bbf7d0; }
+  .alert-err { background: #fef2f2; color: #b91c1c; border: 1.5px solid #fecaca; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .alert-ok  { background: #052e16; color: #4ade80; border-color: #166534; }
+    :root:not([data-theme="light"]) .alert-err { background: #450a0a; color: #f87171; border-color: #991b1b; }
+  }
+  :root[data-theme="dark"] .alert-ok  { background: #052e16; color: #4ade80; border-color: #166534; }
+  :root[data-theme="dark"] .alert-err { background: #450a0a; color: #f87171; border-color: #991b1b; }
+
+  .icon { font-size: 18px; flex-shrink: 0; line-height: 1.4; }
+
+  .footer {
+    border-top: 1px solid var(--border);
+    padding: 16px 28px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
+</style>
+
+<div class="card">
+  <div class="header">
+    <img src="./logo.png" alt="Rye Tri Club" class="logo">
+    <h1>Rye Tri Club</h1>
+    <p>Membership Card</p>
+  </div>
+
+  <div class="body">
+    <p class="intro">
+      Enter your membership number and the email address on your account.
+      We'll send you a fresh card link straight away.
+    </p>
+
+    <form id="form" novalidate>
+      <div class="field">
+        <label for="member_number">Membership number</label>
+        <input id="member_number" type="text" inputmode="numeric"
+               placeholder="e.g. 789012" autocomplete="off" required>
+      </div>
+      <div class="field">
+        <label for="email">Email address</label>
+        <input id="email" type="email" inputmode="email"
+               placeholder="you@example.com" autocomplete="email" required>
+      </div>
+
+      <button class="btn" id="submit-btn" type="submit">
+        <span id="btn-text">Send my membership card</span>
+      </button>
+    </form>
+
+    <div id="alert" hidden></div>
+  </div>
+
+  <div class="footer">
+    Need help? Email <strong>membership@ryetriclub.com</strong>
+  </div>
+</div>
+
+<script>
+  const API = '__API_BASE_URL__/reissue-pass';
+
+  const form      = document.getElementById('form');
+  const btn       = document.getElementById('submit-btn');
+  const btnText   = document.getElementById('btn-text');
+  const alertBox  = document.getElementById('alert');
+
+  function showAlert(type, icon, message) {
+    alertBox.className = 'alert alert-' + type;
+    alertBox.innerHTML = `<span class="icon">${icon}</span><span>${message}</span>`;
+    alertBox.hidden = false;
+  }
+
+  function setLoading(loading) {
+    btn.disabled = loading;
+    if (loading) {
+      btnText.textContent = 'Sending…';
+      const spin = document.createElement('span');
+      spin.className = 'spinner';
+      spin.id = 'spin';
+      btn.appendChild(spin);
+    } else {
+      btnText.textContent = 'Send my membership card';
+      const s = document.getElementById('spin');
+      if (s) s.remove();
+    }
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    alertBox.hidden = true;
+
+    const member_number = document.getElementById('member_number').value.trim();
+    const email         = document.getElementById('email').value.trim();
+
+    if (!member_number || !email) {
+      showAlert('err', '&#x26A0;&#xFE0F;', 'Please enter both your membership number and email address.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch(API, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ member_number, email }),
+      });
+
+      if (res.ok) {
+        form.hidden = true;
+        showAlert('ok', '&#x2705;',
+          'Done! Check your email for your new membership card link. ' +
+          'It may take a minute to arrive.');
+      } else if (res.status === 404) {
+        showAlert('err', '&#x274C;',
+          'No membership found for that number and email combination. ' +
+          'Double-check both and try again, or contact membership@ryetriclub.com.');
+      } else {
+        showAlert('err', '&#x26A0;&#xFE0F;',
+          'Something went wrong on our end. Please try again in a moment, ' +
+          'or contact membership@ryetriclub.com if the problem continues.');
+      }
+    } catch {
+      showAlert('err', '&#x26A0;&#xFE0F;',
+        'Could not reach the server. Check your internet connection and try again.');
+    } finally {
+      setLoading(false);
+    }
+  });
+</script>
