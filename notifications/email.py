@@ -143,6 +143,28 @@ def _build_html(
             {apple_btn}
             {google_btn}
           </table>
+
+          <!-- Reissue notice -->
+          <table width="100%" cellpadding="0" cellspacing="0"
+                 style="margin-top:28px;">
+            <tr>
+              <td style="background:#f0f4ff;border-radius:8px;border:1px solid #c7d4f5;
+                         padding:16px 20px;">
+                <p style="color:#333;font-size:14px;line-height:1.6;margin:0;">
+                  <strong style="color:#0a2463;">Changed your phone?</strong>
+                  Use the link below to cancel your existing card and get a new one sent
+                  straight to your inbox:
+                </p>
+                <p style="margin:10px 0 0;text-align:center;">
+                  <a href="https://membercardrenewal.ryetriclub.com"
+                     style="color:#0a2463;font-size:14px;font-weight:600;
+                            text-decoration:underline;">
+                    membercardrenewal.ryetriclub.com
+                  </a>
+                </p>
+              </td>
+            </tr>
+          </table>
         </td>
       </tr>
 
