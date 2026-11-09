@@ -35,6 +35,11 @@ def webhook_secret() -> str:
 
 
 @pytest.fixture(scope="session")
+def storage_connection_string() -> str:
+    return os.environ.get("DEV_STORAGE_CONNECTION_STRING", "")
+
+
+@pytest.fixture(scope="session")
 def auth_headers(func_key) -> dict:
     return {"x-functions-key": func_key, "Content-Type": "application/json"}
 
