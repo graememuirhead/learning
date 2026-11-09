@@ -577,6 +577,73 @@ def _issue_new_pass(
 
 
 # =========================================================================== #
+# POST /api/reissue-pass  – self-service pass reissue
+# =========================================================================== #
+
+@app.route(route="reissue-pass", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+def reissue_pass(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    Self-service endpoint: member supplies their membership number and email.
+    If both match a record, their existing passes are voided and new ones issued.
+    A welcome email is sent with the new wallet links.
+    """
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _bad_request("Request body must be valid JSON.")
+
+    member_number = _str(body, "member_number")
+    email = _str(body, "email").lower()
+
+    if not member_number or not email:
+        return _bad_request("'member_number' and 'email' are required.")
+
+    # Look up existing passes — need at least one to verify membership
+    apple_pass = db.get_pass_by_member_number(member_number, "apple")
+    google_pass = db.get_pass_by_member_number(member_number, "google")
+    existing = apple_pass or google_pass
+
+    if not existing or existing.get("Email", "").lower() != email:
+        # Deliberately vague — don't reveal whether the member number exists
+        return func.HttpResponse(
+            json.dumps({"error": "No membership found for that number and email combination."}),
+            status_code=404,
+            mimetype="application/json",
+        )
+
+    name = existing.get("Name", "")
+    expiry_date = existing.get("ExpiryDate", "")
+    request_id = str(uuid.uuid4())
+
+    logger.info("reissue-pass member=%s email=%s", member_number, email)
+
+    # Void all existing passes
+    for wallet_type, pass_record in [("apple", apple_pass), ("google", google_pass)]:
+        if pass_record:
+            _expire_old_pass(pass_record["RowKey"], wallet_type)
+
+    apple_pass_url: Optional[str] = None
+    google_save_url: Optional[str] = None
+
+    if apple_pass:
+        try:
+            apple_pass_url = _issue_new_pass(request_id, "apple", name, email, member_number, expiry_date)
+        except Exception:
+            logger.exception("reissue-pass: apple pass failed for member=%s", member_number)
+
+    if google_pass:
+        try:
+            google_save_url = _issue_new_pass(request_id, "google", name, email, member_number, expiry_date)
+        except Exception:
+            logger.exception("reissue-pass: google pass failed for member=%s", member_number)
+
+    if apple_pass_url or google_save_url:
+        send_welcome_email(name, email, member_number, expiry_date, apple_pass_url, google_save_url)
+
+    return _ok({"message": "Your membership card has been reissued. Check your email for the new link."})
+
+
+# =========================================================================== #
 # GET /api/members  – admin CSV export of active members
 # =========================================================================== #
 

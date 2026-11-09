@@ -104,6 +104,10 @@ resource "azurerm_linux_function_app" "main" {
     }
     application_insights_key               = azurerm_application_insights.main.instrumentation_key
     application_insights_connection_string = azurerm_application_insights.main.connection_string
+    cors {
+      allowed_origins     = ["*"]
+      support_credentials = false
+    }
   }
 
   app_settings = {
