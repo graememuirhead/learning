@@ -40,7 +40,8 @@ def test_webhook_membership_activated(func_url, webhook_secret):
         import pytest
         pytest.skip("DEV_WEBHOOK_SECRET not set")
     resp = requests.post(
-        f"{func_url}/webhook/wild-apricot?secret={webhook_secret}",
+        f"{func_url}/webhook/wild-apricot",
+        params={"secret": webhook_secret},
         json=VALID_PAYLOAD,
         timeout=60,
     )
@@ -53,7 +54,8 @@ def test_webhook_membership_renewed(func_url, webhook_secret):
         pytest.skip("DEV_WEBHOOK_SECRET not set")
     payload = {**VALID_PAYLOAD, "EventType": "MembershipRenewed"}
     resp = requests.post(
-        f"{func_url}/webhook/wild-apricot?secret={webhook_secret}",
+        f"{func_url}/webhook/wild-apricot",
+        params={"secret": webhook_secret},
         json=payload,
         timeout=60,
     )
@@ -66,7 +68,8 @@ def test_webhook_unknown_event_type_is_ignored(func_url, webhook_secret):
         pytest.skip("DEV_WEBHOOK_SECRET not set")
     payload = {**VALID_PAYLOAD, "EventType": "SomeOtherEvent"}
     resp = requests.post(
-        f"{func_url}/webhook/wild-apricot?secret={webhook_secret}",
+        f"{func_url}/webhook/wild-apricot",
+        params={"secret": webhook_secret},
         json=payload,
         timeout=30,
     )
