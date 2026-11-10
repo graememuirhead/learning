@@ -1,0 +1,63 @@
+name: Smoke Test (send real email)
+
+on:
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  smoke_test:
+    name: Smoke Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install test dependencies
+        run: pip install -r requirements-test.txt requests
+
+      - name: Verify SendGrid API key works
+        env:
+          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
+        run: |
+          python - <<'EOF'
+          import os, sys, json
+          import urllib.request, urllib.error
+
+          key = os.environ.get("SENDGRID_API_KEY", "")
+          if not key:
+              print("ERROR: SENDGRID_API_KEY secret is not set")
+              sys.exit(1)
+
+          payload = json.dumps({
+              "personalizations": [{"to": [{"email": "graeme@ryetriclub.com"}]}],
+              "from": {"email": "membership@ryetriclub.com", "name": "Rye Tri Club"},
+              "subject": "Rye Tri – smoke test (direct SendGrid)",
+              "content": [{"type": "text/plain", "value": "This is a direct SendGrid smoke test."}],
+          }).encode()
+
+          req = urllib.request.Request(
+              "https://api.sendgrid.com/v3/mail/send",
+              data=payload,
+              headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+              method="POST",
+          )
+          try:
+              with urllib.request.urlopen(req) as r:
+                  print(f"SendGrid accepted email: HTTP {r.status}")
+          except urllib.error.HTTPError as e:
+              body = e.read().decode()
+              print(f"SendGrid rejected email: HTTP {e.code} — {body}")
+              sys.exit(1)
+          EOF
+
+      - name: Run smoke test (via webhook)
+        env:
+          DEV_FUNCTION_URL: https://ryetri-dev-func.azurewebsites.net/api
+          DEV_WEBHOOK_SECRET: ${{ secrets.WILD_APRICOT_WEBHOOK_SECRET }}
+        run: pytest tests/integration/test_smoke_email.py -v -m smoke -s
