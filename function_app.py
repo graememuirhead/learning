@@ -469,8 +469,8 @@ def wild_apricot_webhook(req: func.HttpRequest) -> func.HttpResponse:
       MembershipRenewed    – existing member renews (reissues pass with new expiry)
     """
     # Verify shared secret
-    provided = req.params.get("secret", "")
-    expected = Settings.WILD_APRICOT_WEBHOOK_SECRET
+    provided = req.params.get("secret", "").strip()
+    expected = Settings.WILD_APRICOT_WEBHOOK_SECRET.strip()
     if not expected or not secrets.compare_digest(provided, expected):
         logger.warning("wild-apricot-webhook: rejected unauthorised request")
         return func.HttpResponse(status_code=401)

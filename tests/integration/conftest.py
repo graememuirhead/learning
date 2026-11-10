@@ -31,7 +31,7 @@ def func_key() -> str:
 
 @pytest.fixture(scope="session")
 def webhook_secret() -> str:
-    return os.environ.get("DEV_WEBHOOK_SECRET", "")
+    return os.environ.get("DEV_WEBHOOK_SECRET", "").strip()
 
 
 @pytest.fixture(scope="session")
