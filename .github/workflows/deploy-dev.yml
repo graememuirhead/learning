@@ -254,7 +254,7 @@ jobs:
         env:
           DEV_FUNCTION_URL: https://${{ needs.infrastructure.outputs.function_app_name }}.azurewebsites.net/api
           DEV_WEBHOOK_SECRET: ${{ secrets.WILD_APRICOT_WEBHOOK_SECRET }}
-        run: pytest tests/integration/ -v
+        run: pytest tests/integration/ -v -m "not smoke"
 
   # --------------------------------------------------------------------------
   # E2E tests — run against deployed static site

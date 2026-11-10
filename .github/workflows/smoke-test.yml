@@ -1,0 +1,28 @@
+name: Smoke Test (send real email)
+
+on:
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  smoke_test:
+    name: Smoke Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install test dependencies
+        run: pip install -r requirements-test.txt requests
+
+      - name: Run smoke test
+        env:
+          DEV_FUNCTION_URL: https://ryetri-dev-func.azurewebsites.net/api
+          DEV_WEBHOOK_SECRET: ${{ secrets.WILD_APRICOT_WEBHOOK_SECRET }}
+        run: pytest tests/integration/test_smoke_email.py -v -m smoke -s
