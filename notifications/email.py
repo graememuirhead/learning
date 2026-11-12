@@ -84,10 +84,15 @@ def _build_html(
 
       <!-- Header -->
       <tr>
-        <td style="background:#0a2463;padding:36px 32px;text-align:center;">
+        <td style="background:#cc0000;padding:28px 32px 24px;text-align:center;">
+          <img src="https://membercardrenewal.ryetriclub.com/logo.png"
+               alt="Rye Tri Club"
+               width="80" height="80"
+               style="display:block;margin:0 auto 14px;border-radius:50%;
+                      border:3px solid rgba(255,255,255,0.3);">
           <h1 style="color:#ffffff;margin:0;font-size:26px;font-weight:700;
                      letter-spacing:1px;">RYE TRI CLUB</h1>
-          <p style="color:#8fa8d8;margin:6px 0 0;font-size:14px;
+          <p style="color:#ffcccc;margin:6px 0 0;font-size:14px;
                     letter-spacing:2px;text-transform:uppercase;">Membership Card</p>
         </td>
       </tr>
@@ -115,19 +120,19 @@ def _build_html(
                     <td style="padding:6px 0;width:50%;">
                       <span style="color:#888;font-size:11px;text-transform:uppercase;
                                    letter-spacing:1px;">Member</span><br>
-                      <strong style="color:#0a2463;font-size:15px;">{name}</strong>
+                      <strong style="color:#cc0000;font-size:15px;">{name}</strong>
                     </td>
                     <td style="padding:6px 0;width:50%;">
                       <span style="color:#888;font-size:11px;text-transform:uppercase;
                                    letter-spacing:1px;">Member #</span><br>
-                      <strong style="color:#0a2463;font-size:15px;">{member_number}</strong>
+                      <strong style="color:#cc0000;font-size:15px;">{member_number}</strong>
                     </td>
                   </tr>
                   <tr>
                     <td style="padding:6px 0;" colspan="2">
                       <span style="color:#888;font-size:11px;text-transform:uppercase;
                                    letter-spacing:1px;">Valid Through</span><br>
-                      <strong style="color:#0a2463;font-size:15px;">{expiry_date}</strong>
+                      <strong style="color:#cc0000;font-size:15px;">{expiry_date}</strong>
                     </td>
                   </tr>
                 </table>
@@ -151,13 +156,13 @@ def _build_html(
               <td style="background:#f0f4ff;border-radius:8px;border:1px solid #c7d4f5;
                          padding:16px 20px;">
                 <p style="color:#333;font-size:14px;line-height:1.6;margin:0;">
-                  <strong style="color:#0a2463;">Changed your phone?</strong>
+                  <strong style="color:#cc0000;">Changed your phone?</strong>
                   Use the link below to cancel your existing card and get a new one sent
                   straight to your inbox:
                 </p>
                 <p style="margin:10px 0 0;text-align:center;">
                   <a href="https://membercardrenewal.ryetriclub.com"
-                     style="color:#0a2463;font-size:14px;font-weight:600;
+                     style="color:#cc0000;font-size:14px;font-weight:600;
                             text-decoration:underline;">
                     membercardrenewal.ryetriclub.com
                   </a>
@@ -175,8 +180,8 @@ def _build_html(
           <p style="color:#999;font-size:12px;margin:0 0 4px;">
             Questions? Email us at
             <a href="mailto:membership@ryetriclub.com"
-               style="color:#0a2463;text-decoration:none;">membership@ryetriclub.com</a>
-            or visit <a href="https://www.ryetri.org" style="color:#0a2463;">www.ryetri.org</a>
+               style="color:#cc0000;text-decoration:none;">membership@ryetriclub.com</a>
+            or visit <a href="https://www.ryetri.org" style="color:#cc0000;">www.ryetri.org</a>
           </p>
           <p style="color:#bbb;font-size:11px;margin:6px 0 0;">
             This membership card is personal and non-transferable.
