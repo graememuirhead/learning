@@ -152,7 +152,7 @@ def _build_generic_class(class_id: str) -> dict:
             {
                 "mainImage": {
                     "sourceUri": {
-                        "uri": _logo_data_uri()
+                        "uri": _logo_url()
                     },
                     "contentDescription": {
                         "defaultValue": {
@@ -190,10 +190,10 @@ def _build_generic_object(
         "id": object_id,
         "classId": class_id,
         "genericType": "GENERIC_TYPE_UNSPECIFIED",
-        "hexBackgroundColor": "#0a2463",
+        "hexBackgroundColor": "#cc0000",
         "logo": {
             "sourceUri": {
-                "uri": _logo_data_uri()
+                "uri": _logo_url()
             },
             "contentDescription": {
                 "defaultValue": {
@@ -296,21 +296,27 @@ def _auth_headers() -> dict:
     return {"Authorization": f"Bearer {credentials.token}"}
 
 
-def _logo_data_uri() -> str:
+def _logo_url() -> str:
     """
-    Return the logo as a data URI so it can be embedded in the JWT payload.
-    Falls back to an empty string if the logo is unavailable.
+    Return a URL for the club logo suitable for embedding in Google Wallet pass JWTs.
 
-    NOTE: Google Wallet also accepts a public HTTPS URL. If you host the logo
-    publicly, set LOGO_PUBLIC_URL in env and return that instead.
+    Prefers a public HTTPS URL (required to keep the JWT small enough to store in
+    Azure Table Storage, which caps string properties at 64 KB). Falls back to a
+    data URI only when no public URL is configured — the data URI approach works
+    locally but produces a JWT that is far too large to persist in Table Storage.
     """
-    import base64
     import os
 
     public_url = os.environ.get("LOGO_PUBLIC_URL", "")
     if public_url:
         return public_url
 
+    static_website_url = Settings.STATIC_WEBSITE_URL
+    if static_website_url:
+        return f"{static_website_url}/{Settings.LOGO_FILENAME}"
+
+    # Last resort: data URI (only safe for local testing, not Azure production)
+    import base64
     logo_bytes = Settings.get_logo_bytes()
     b64 = base64.b64encode(logo_bytes).decode("utf-8")
     return f"data:image/png;base64,{b64}"
