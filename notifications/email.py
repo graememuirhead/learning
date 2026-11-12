@@ -181,7 +181,7 @@ def _build_html(
             Questions? Email us at
             <a href="mailto:membership@ryetriclub.com"
                style="color:#cc0000;text-decoration:none;">membership@ryetriclub.com</a>
-            or visit <a href="https://www.ryetri.org" style="color:#cc0000;">www.ryetri.org</a>
+            or visit <a href="https://www.ryetriclub.com" style="color:#cc0000;">www.ryetriclub.com</a>
           </p>
           <p style="color:#bbb;font-size:11px;margin:6px 0 0;">
             This membership card is personal and non-transferable.
