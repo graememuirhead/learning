@@ -21,6 +21,22 @@ jobs:
       - name: Install test dependencies
         run: pip install -r requirements-test.txt requests
 
+      - name: Azure CLI Login
+        run: |
+          az login --service-principal \
+            --username ${{ secrets.AZURE_CLIENT_ID }} \
+            --password ${{ secrets.AZURE_CLIENT_SECRET }} \
+            --tenant ${{ secrets.AZURE_TENANT_ID }}
+          az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Get dev function key
+        run: |
+          KEY=$(az functionapp keys list \
+            --name ryetri-dev-func \
+            --resource-group ryetri-dev-rg \
+            --query 'functionKeys.default' -o tsv)
+          echo "DEV_FUNCTION_KEY=$KEY" >> $GITHUB_ENV
+
       - name: Verify SendGrid API key works
         env:
           SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
