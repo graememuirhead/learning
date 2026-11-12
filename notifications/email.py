@@ -88,8 +88,8 @@ def _build_html(
         <td style="background:#cc0000;padding:28px 32px 24px;text-align:center;">
           <img src="{static_website_url}/logo.png"
                alt="Rye Tri Club"
-               width="80" height="80"
-               style="display:block;margin:0 auto 14px;">
+               width="200"
+               style="display:block;margin:0 auto 14px;height:auto;max-width:200px;">
           <h1 style="color:#ffffff;margin:0;font-size:26px;font-weight:700;
                      letter-spacing:1px;">RYE TRI CLUB</h1>
           <p style="color:#ffcccc;margin:6px 0 0;font-size:14px;
