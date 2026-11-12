@@ -92,6 +92,7 @@ class Settings:
     # ---- Notifications ----
     SENDGRID_API_KEY: str = os.environ.get("SENDGRID_API_KEY", "")
     FROM_EMAIL: str = os.environ.get("FROM_EMAIL", "membership@ryetriclub.com")
+    STATIC_WEBSITE_URL: str = os.environ.get("STATIC_WEBSITE_URL", "")
 
     # ---- Wild Apricot webhook ----
     WILD_APRICOT_WEBHOOK_SECRET: str = os.environ.get("WILD_APRICOT_WEBHOOK_SECRET", "")

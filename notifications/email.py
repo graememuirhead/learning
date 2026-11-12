@@ -29,7 +29,7 @@ def send_welcome_email(
             from_email=Settings.FROM_EMAIL,
             to_emails=email,
             subject="Welcome to Rye Tri Club – Your Membership Card",
-            html_content=_build_html(name, member_number, expiry_date, apple_pass_url, google_save_url),
+            html_content=_build_html(name, member_number, expiry_date, apple_pass_url, google_save_url, Settings.STATIC_WEBSITE_URL),
         )
         response = SendGridAPIClient(Settings.SENDGRID_API_KEY).send(message)
         logger.info("Welcome email sent to %s status=%d", email, response.status_code)
@@ -45,6 +45,7 @@ def _build_html(
     expiry_date: str,
     apple_pass_url: Optional[str],
     google_save_url: Optional[str],
+    static_website_url: str = "",
 ) -> str:
     first_name = name.split()[0] if name else name
 
@@ -85,7 +86,7 @@ def _build_html(
       <!-- Header -->
       <tr>
         <td style="background:#cc0000;padding:28px 32px 24px;text-align:center;">
-          <img src="https://membercardrenewal.ryetriclub.com/logo.png"
+          <img src="{static_website_url}/logo.png"
                alt="Rye Tri Club"
                width="80" height="80"
                style="display:block;margin:0 auto 14px;border-radius:50%;
