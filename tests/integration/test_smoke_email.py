@@ -1,27 +1,41 @@
 """
 Smoke tests: send real emails to graeme@ryetriclub.com.
 
-Run manually to verify the email template and pass links look correct end-to-end.
-
-    # First issue (MembershipActivated webhook):
+Smoke test #1 — new passes via MembershipActivated webhook:
     pytest tests/integration/test_smoke_email.py::test_smoke_welcome_email -v -m smoke -s
 
-    # Re-issue (self-service reissue endpoint) — run after the first test has fired today:
+Smoke test #2 — reissue (void + recreate) via self-service endpoint:
     pytest tests/integration/test_smoke_email.py::test_smoke_reissue_pass -v -m smoke -s
 
+Run test #1 first; test #2 operates on the same member.
 These tests are excluded from normal CI runs.
 """
-from datetime import date
+from datetime import datetime
 
 import pytest
 import requests
 
 
-def _smoke_payload() -> dict:
-    # Use a date-based member ID so each calendar day gets fresh passes.
-    # Format: 9YYYYMMDD fits in an int and is clearly a test ID (starts with 9).
-    member_id = int(f"9{date.today().strftime('%Y%m%d')}")
-    return {
+def _smoke_member_id() -> int:
+    # Hour-precision ID: changes each hour so every session gets fresh passes.
+    # Format 9YYYYMMDDHH fits in a 64-bit int and is clearly a test ID.
+    return int(f"9{datetime.now().strftime('%Y%m%d%H')}")
+
+
+@pytest.mark.smoke
+def test_smoke_welcome_email(func_url, webhook_secret):
+    """
+    Trigger a MembershipActivated webhook for today's smoke member.
+    Fresh passes are created each hour, so this always produces a new pass.
+    Check graeme@ryetriclub.com for the welcome email with Apple + Google buttons.
+    """
+    if not webhook_secret:
+        pytest.skip("DEV_WEBHOOK_SECRET not set")
+
+    member_id = _smoke_member_id()
+    print(f"\n  Smoke member ID: {member_id}")
+
+    payload = {
         "EventType": "MembershipActivated",
         "AccountId": 123456,
         "Parameters": {
@@ -34,21 +48,6 @@ def _smoke_payload() -> dict:
             }
         },
     }
-
-
-@pytest.mark.smoke
-def test_smoke_welcome_email(func_url, webhook_secret):
-    """
-    Trigger a MembershipActivated webhook for member 99997 (graeme@ryetriclub.com).
-    A welcome email with Apple and Google pass links is sent to that address.
-    Check your inbox to verify the email layout and that both pass links work.
-    """
-    if not webhook_secret:
-        pytest.skip("DEV_WEBHOOK_SECRET not set")
-
-    payload = _smoke_payload()
-    member_id = payload["Parameters"]["Contact"]["Id"]
-    print(f"\n  Smoke member ID for today: {member_id}")
 
     resp = requests.post(
         f"{func_url}/webhook/wild-apricot",
@@ -66,10 +65,9 @@ def test_smoke_reissue_pass(func_url):
     Reissue passes for today's smoke member via the self-service /reissue-pass endpoint.
     Voids the existing passes and creates fresh ones, then sends a welcome email.
 
-    Requires test_smoke_welcome_email to have run first today (to create the initial passes).
+    Run test_smoke_welcome_email first (within the same hour) to create the initial passes.
     """
-    member_id = int(f"9{date.today().strftime('%Y%m%d')}")
-    member_number = str(member_id)
+    member_number = str(_smoke_member_id())
     email = "graeme@ryetriclub.com"
 
     print(f"\n  Reissuing passes for smoke member: {member_number}")

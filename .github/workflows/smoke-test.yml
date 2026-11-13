@@ -1,4 +1,4 @@
-name: Smoke Test (send real email)
+name: Smoke Test 1 – New passes
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ env:
 
 jobs:
   smoke_test:
-    name: Smoke Test
+    name: Smoke Test 1
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -122,8 +122,8 @@ jobs:
               sys.exit(1)
           EOF
 
-      - name: Run smoke test (via webhook)
+      - name: Send new passes via webhook
         env:
           DEV_FUNCTION_URL: https://ryetri-dev-func.azurewebsites.net/api
           DEV_WEBHOOK_SECRET: ${{ secrets.WILD_APRICOT_WEBHOOK_SECRET }}
-        run: pytest tests/integration/test_smoke_email.py -v -m smoke -s
+        run: pytest tests/integration/test_smoke_email.py::test_smoke_welcome_email -v -m smoke -s
