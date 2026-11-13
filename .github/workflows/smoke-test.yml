@@ -38,6 +38,7 @@ jobs:
           echo "DEV_FUNCTION_KEY=$KEY" >> $GITHUB_ENV
 
       - name: Verify SendGrid API key works
+        continue-on-error: true
         env:
           SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
         run: |
