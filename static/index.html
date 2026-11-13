@@ -235,16 +235,15 @@
 
   function setLoading(loading) {
     btn.disabled = loading;
-    if (loading) {
-      btnText.textContent = 'Sending…';
+    btn.style.opacity = loading ? '0.75' : '';
+    const existing = document.getElementById('spin');
+    if (loading && !existing) {
       const spin = document.createElement('span');
       spin.className = 'spinner';
       spin.id = 'spin';
       btn.appendChild(spin);
-    } else {
-      btnText.textContent = 'Send my membership card';
-      const s = document.getElementById('spin');
-      if (s) s.remove();
+    } else if (!loading && existing) {
+      existing.remove();
     }
   }
 
