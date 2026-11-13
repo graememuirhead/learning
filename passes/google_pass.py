@@ -191,6 +191,17 @@ def _build_generic_object(
         "classId": class_id,
         "genericType": "GENERIC_TYPE_UNSPECIFIED",
         "hexBackgroundColor": "#cc0000",
+        "logo": {
+            "sourceUri": {
+                "uri": _logo_url()
+            },
+            "contentDescription": {
+                "defaultValue": {
+                    "language": "en-US",
+                    "value": "Rye Tri Club Logo",
+                }
+            },
+        },
         "wideLogo": {
             "sourceUri": {
                 "uri": _logo_url()
