@@ -75,12 +75,15 @@ class Settings:
     @staticmethod
     def get_google_service_account() -> dict:
         """Return parsed Google service account JSON."""
-        b64 = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON", "")
-        if b64:
-            # Some base64 encoders (online tools, iOS Shortcuts) omit trailing = padding.
-            # Python's b64decode requires it, so add it back if missing.
-            b64 += "=" * (-len(b64) % 4)
-            return json.loads(base64.b64decode(b64))
+        value = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON", "")
+        if value:
+            stripped = value.strip()
+            # Accept raw JSON directly (no base64 needed)
+            if stripped.startswith("{"):
+                return json.loads(stripped)
+            # Otherwise treat as base64 (add padding if missing)
+            stripped += "=" * (-len(stripped) % 4)
+            return json.loads(base64.b64decode(stripped))
         sa_file = ASSETS_DIR / "google_service_account.json"
         if sa_file.exists():
             return json.loads(sa_file.read_text())
