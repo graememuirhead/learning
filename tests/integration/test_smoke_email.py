@@ -10,16 +10,16 @@ Smoke test #2 — reissue (void + recreate) via self-service endpoint:
 Run test #1 first; test #2 operates on the same member.
 These tests are excluded from normal CI runs.
 """
-from datetime import datetime
+from datetime import date
 
 import pytest
 import requests
 
 
 def _smoke_member_id() -> int:
-    # Hour-precision ID: changes each hour so every session gets fresh passes.
-    # Format 9YYYYMMDDHH fits in a 64-bit int and is clearly a test ID.
-    return int(f"9{datetime.now().strftime('%Y%m%d%H')}")
+    # Date-based ID: one smoke member per calendar day.
+    # Test 1 may reuse existing passes; test 2 always voids and recreates.
+    return int(f"9{date.today().strftime('%Y%m%d')}")
 
 
 @pytest.mark.smoke
