@@ -1,12 +1,15 @@
 """
-Smoke test: send a real welcome email to graeme@ryetriclub.com.
+Smoke tests: send real emails to graeme@ryetriclub.com.
 
-Run manually before pushing to production to verify the email template
-and pass links look correct end-to-end.
+Run manually to verify the email template and pass links look correct end-to-end.
 
-    pytest tests/integration/test_smoke_email.py -v -m smoke
+    # First issue (MembershipActivated webhook):
+    pytest tests/integration/test_smoke_email.py::test_smoke_welcome_email -v -m smoke -s
 
-This test is excluded from normal CI runs.
+    # Re-issue (self-service reissue endpoint) — run after the first test has fired today:
+    pytest tests/integration/test_smoke_email.py::test_smoke_reissue_pass -v -m smoke -s
+
+These tests are excluded from normal CI runs.
 """
 from datetime import date
 
@@ -55,3 +58,28 @@ def test_smoke_welcome_email(func_url, webhook_secret):
     )
     assert resp.status_code == 200, f"Webhook returned {resp.status_code}: {resp.text[:300]}"
     print("✓ Webhook accepted. Check graeme@ryetriclub.com for the welcome email.")
+
+
+@pytest.mark.smoke
+def test_smoke_reissue_pass(func_url):
+    """
+    Reissue passes for today's smoke member via the self-service /reissue-pass endpoint.
+    Voids the existing passes and creates fresh ones, then sends a welcome email.
+
+    Requires test_smoke_welcome_email to have run first today (to create the initial passes).
+    """
+    member_id = int(f"9{date.today().strftime('%Y%m%d')}")
+    member_number = str(member_id)
+    email = "graeme@ryetriclub.com"
+
+    print(f"\n  Reissuing passes for smoke member: {member_number}")
+
+    resp = requests.post(
+        f"{func_url}/reissue-pass",
+        json={"member_number": member_number, "email": email},
+        timeout=60,
+    )
+    assert resp.status_code == 200, f"Reissue returned {resp.status_code}: {resp.text[:300]}"
+    data = resp.json()
+    assert "reissued" in data.get("message", "").lower(), f"Unexpected response: {data}"
+    print("✓ Reissue accepted. Check graeme@ryetriclub.com for the new welcome email.")
