@@ -49,8 +49,8 @@ def seed_test_member(func_url, auth_headers):
     """Ensure TEST99999 has an active apple pass before integration tests run."""
     import time
 
-    # Retry up to 90 s to handle the case where dev is mid-deployment.
-    deadline = time.time() + 90
+    # Retry up to 180 s to handle the case where dev is mid-deployment.
+    deadline = time.time() + 180
     delay = 5
     while True:
         resp = requests.post(
