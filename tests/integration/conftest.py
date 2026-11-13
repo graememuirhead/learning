@@ -47,13 +47,21 @@ def auth_headers(func_key) -> dict:
 @pytest.fixture(scope="session", autouse=True)
 def seed_test_member(func_url, auth_headers):
     """Ensure TEST99999 has an active apple pass before integration tests run."""
-    resp = requests.post(
-        f"{func_url}/create-pass",
-        json={**TEST_MEMBER, "wallet_type": "apple"},
-        headers=auth_headers,
-        timeout=30,
-    )
-    # 200 = created, 409 = already exists — both are fine
-    assert resp.status_code in (200, 409), (
-        f"Could not seed test member: {resp.status_code} {resp.text[:300]}"
-    )
+    import time
+
+    # Retry up to 90 s to handle the case where dev is mid-deployment.
+    deadline = time.time() + 90
+    delay = 5
+    while True:
+        resp = requests.post(
+            f"{func_url}/create-pass",
+            json={**TEST_MEMBER, "wallet_type": "apple"},
+            headers=auth_headers,
+            timeout=30,
+        )
+        # 200 = created, 409 = already exists — both are fine
+        if resp.status_code in (200, 409):
+            return
+        if time.time() >= deadline:
+            assert False, f"Could not seed test member: {resp.status_code} {resp.text[:300]}"
+        time.sleep(delay)
