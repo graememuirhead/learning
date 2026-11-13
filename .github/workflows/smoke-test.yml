@@ -72,6 +72,50 @@ jobs:
               sys.exit(1)
           EOF
 
+      - name: Test Google pass creation directly
+        run: |
+          python - <<'EOF'
+          import os, sys, json
+          import urllib.request, urllib.error
+
+          func_url = "https://ryetri-dev-func.azurewebsites.net/api"
+          func_key = os.environ.get("DEV_FUNCTION_KEY", "")
+          if not func_key:
+              print("ERROR: DEV_FUNCTION_KEY not available")
+              sys.exit(1)
+
+          payload = json.dumps({
+              "name": "Smoke Test Google",
+              "email": "graeme@ryetriclub.com",
+              "member_number": "SMOKE_GOOGLE_TEST",
+              "expiry_date": "2099-12-31",
+              "wallet_type": "google",
+          }).encode()
+
+          req = urllib.request.Request(
+              f"{func_url}/create-pass",
+              data=payload,
+              headers={
+                  "x-functions-key": func_key,
+                  "Content-Type": "application/json",
+              },
+              method="POST",
+          )
+          try:
+              with urllib.request.urlopen(req) as r:
+                  body = r.read().decode()
+                  data = json.loads(body)
+                  url = data.get("pass_url", "")
+                  print(f"Google pass created OK: HTTP {r.status}")
+                  print(f"pass_url length: {len(url)} chars")
+                  print(f"pass_url starts with: {url[:80]}")
+          except urllib.error.HTTPError as e:
+              body = e.read().decode()
+              print(f"Google pass creation FAILED: HTTP {e.code}")
+              print(f"Response: {body[:1000]}")
+              sys.exit(1)
+          EOF
+
       - name: Run smoke test (via webhook)
         env:
           DEV_FUNCTION_URL: https://ryetri-dev-func.azurewebsites.net/api
