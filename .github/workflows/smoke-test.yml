@@ -75,7 +75,7 @@ jobs:
       - name: Test Google pass creation directly
         run: |
           python - <<'EOF'
-          import os, sys, json
+          import os, sys, json, uuid
           import urllib.request, urllib.error
 
           func_url = "https://ryetri-dev-func.azurewebsites.net/api"
@@ -84,10 +84,13 @@ jobs:
               print("ERROR: DEV_FUNCTION_KEY not available")
               sys.exit(1)
 
+          # Use a unique member number each run so we always get a fresh pass
+          unique_member = f"SMOKE-{uuid.uuid4().hex[:8].upper()}"
+
           payload = json.dumps({
               "name": "Smoke Test Google",
               "email": "graeme@ryetriclub.com",
-              "member_number": "SMOKE_GOOGLE_TEST",
+              "member_number": unique_member,
               "expiry_date": "2099-12-31",
               "wallet_type": "google",
           }).encode()
@@ -108,7 +111,9 @@ jobs:
                   url = data.get("pass_url", "")
                   print(f"Google pass created OK: HTTP {r.status}")
                   print(f"pass_url length: {len(url)} chars")
-                  print(f"pass_url starts with: {url[:80]}")
+                  print(f"")
+                  print(f"Open this URL on your phone to inspect the pass:")
+                  print(f"{url}")
           except urllib.error.HTTPError as e:
               body = e.read().decode()
               print(f"Google pass creation FAILED: HTTP {e.code}")
