@@ -485,6 +485,13 @@ def wild_apricot_webhook(req: func.HttpRequest) -> func.HttpResponse:
 
     if event_type not in ("MembershipActivated", "MembershipRenewed"):
         # Acknowledge silently — we don't process other event types
+        db.log_api_call(
+            endpoint="webhook/wild-apricot",
+            event_type=event_type,
+            action="ignored",
+            result="ok",
+            raw_payload=json.dumps(body)[:2000],
+        )
         return func.HttpResponse(status_code=200)
 
     # Wild Apricot payload: { EventType, AccountId, Parameters: { Contact: {...} } }
@@ -507,7 +514,14 @@ def wild_apricot_webhook(req: func.HttpRequest) -> func.HttpResponse:
             "member_number=%r expiry=%r — raw payload logged at DEBUG",
             bool(name), bool(email), bool(member_number), bool(expiry_date),
         )
-        logger.debug("wild-apricot-webhook raw payload: %s", json.dumps(body)[:2000])
+        db.log_api_call(
+            endpoint="webhook/wild-apricot",
+            event_type=event_type,
+            action="rejected",
+            result="error",
+            error_message=f"Missing fields: name={bool(name)} email={bool(email)} member={bool(member_number)} expiry={bool(expiry_date)}",
+            raw_payload=json.dumps(body)[:2000],
+        )
         return func.HttpResponse("Missing required member fields", status_code=422)
 
     logger.info(
@@ -550,13 +564,30 @@ def wild_apricot_webhook(req: func.HttpRequest) -> func.HttpResponse:
                 wallet_type, member_number,
             )
 
+    email_sent = False
     if apple_pass_url or google_save_url:
-        send_welcome_email(name, email, member_number, expiry_date, apple_pass_url, google_save_url)
+        try:
+            send_welcome_email(name, email, member_number, expiry_date, apple_pass_url, google_save_url)
+            email_sent = True
+        except Exception:
+            logger.exception("wild-apricot-webhook: failed to send email for member=%s", member_number)
     else:
         logger.error(
             "wild-apricot-webhook: both pass types failed for member=%s — no email sent",
             member_number,
         )
+
+    db.log_api_call(
+        endpoint="webhook/wild-apricot",
+        member_number=member_number,
+        email=email,
+        event_type=event_type,
+        action="passes_issued" if (apple_pass_url or google_save_url) else "passes_failed",
+        result="success" if (apple_pass_url or google_save_url) else "error",
+        error_message="" if (apple_pass_url or google_save_url) else "Both pass types failed",
+        email_sent=email_sent,
+        raw_payload=json.dumps(body)[:2000],
+    )
 
     return func.HttpResponse(status_code=200)
 
@@ -646,10 +677,50 @@ def reissue_pass(req: func.HttpRequest) -> func.HttpResponse:
         except Exception:
             logger.exception("reissue-pass: google pass failed for member=%s", member_number)
 
+    email_sent = False
     if apple_pass_url or google_save_url:
-        send_welcome_email(name, email, member_number, expiry_date, apple_pass_url, google_save_url)
+        try:
+            send_welcome_email(name, email, member_number, expiry_date, apple_pass_url, google_save_url)
+            email_sent = True
+        except Exception:
+            logger.exception("reissue-pass: failed to send email for member=%s", member_number)
+
+    db.log_api_call(
+        endpoint="reissue-pass",
+        member_number=member_number,
+        email=email,
+        event_type="reissue",
+        action="passes_reissued" if (apple_pass_url or google_save_url) else "passes_failed",
+        result="success" if (apple_pass_url or google_save_url) else "error",
+        email_sent=email_sent,
+    )
 
     return _ok({"message": "Your membership card has been reissued. Check your email for the new link."})
+
+
+# =========================================================================== #
+# GET /api/call-log  – admin view of recent API calls
+# =========================================================================== #
+
+@app.route(route="call-log", methods=["GET"])
+def get_call_log(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    Return the last N API call log entries as JSON.
+    Requires a function key (?code=...).
+    Query params:
+        limit  – max rows to return (default 50, max 200)
+    """
+    try:
+        limit = min(int(req.params.get("limit", "50")), 200)
+    except ValueError:
+        limit = 50
+
+    rows = db.list_api_calls(limit)
+    return func.HttpResponse(
+        json.dumps({"count": len(rows), "calls": rows}, indent=2),
+        status_code=200,
+        mimetype="application/json",
+    )
 
 
 # =========================================================================== #

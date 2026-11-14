@@ -35,6 +35,7 @@ logger = logging.getLogger(__name__)
 TABLE_REQUESTS = "PassRequests"
 TABLE_PASSES = "IssuedPasses"
 TABLE_DEVICE_REG = "DeviceRegistrations"
+TABLE_CALL_LOG = "ApiCallLog"
 
 # Use a single partition key for simplicity (low-volume use-case).
 # For higher volumes, partition by member number or date prefix.
@@ -65,6 +66,76 @@ def _blob_client():
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+# --------------------------------------------------------------------------- #
+# API Call Log  (human-readable record of every significant API call)
+# --------------------------------------------------------------------------- #
+
+def log_api_call(
+    endpoint: str,
+    member_number: str = "",
+    email: str = "",
+    event_type: str = "",
+    action: str = "",
+    result: str = "",
+    error_message: str = "",
+    email_sent: bool = False,
+    raw_payload: str = "",
+) -> None:
+    """
+    Write one row to ApiCallLog for every webhook / reissue / create-pass call.
+    RowKey uses an inverted timestamp so the newest entry sorts first on a table scan.
+    """
+    import uuid as _uuid
+    now = datetime.now(timezone.utc)
+    # Inverted millis → newest row comes first alphabetically
+    inverted = str(10 ** 15 - int(now.timestamp() * 1000)).zfill(15)
+    row_key = f"{inverted}_{_uuid.uuid4().hex[:8]}"
+
+    entity = {
+        "PartitionKey": PARTITION_KEY,
+        "RowKey": row_key,
+        "CalledAt": now.isoformat(),
+        "Endpoint": endpoint,
+        "MemberNumber": member_number,
+        "Email": email,
+        "EventType": event_type,
+        "Action": action,
+        "Result": result,
+        "ErrorMessage": error_message[:500] if error_message else "",
+        "EmailSent": email_sent,
+        "RawPayload": raw_payload[:2000] if raw_payload else "",
+    }
+    try:
+        _table_client(TABLE_CALL_LOG).upsert_entity(entity)
+    except Exception:
+        logger.exception("Failed to write ApiCallLog for endpoint=%s member=%s", endpoint, member_number)
+
+
+def list_api_calls(limit: int = 100) -> list[dict]:
+    """Return the most recent API call log entries (newest first)."""
+    client = _table_client(TABLE_CALL_LOG)
+    entities = client.query_entities(f"PartitionKey eq '{PARTITION_KEY}'")
+    rows = []
+    for e in entities:
+        rows.append({
+            "called_at": e.get("CalledAt", ""),
+            "endpoint": e.get("Endpoint", ""),
+            "member_number": e.get("MemberNumber", ""),
+            "email": e.get("Email", ""),
+            "event_type": e.get("EventType", ""),
+            "action": e.get("Action", ""),
+            "result": e.get("Result", ""),
+            "error_message": e.get("ErrorMessage", ""),
+            "email_sent": e.get("EmailSent", False),
+            "raw_payload": e.get("RawPayload", ""),
+        })
+        if len(rows) >= limit:
+            break
+    # Already newest-first due to inverted RowKey; sort in Python as a safeguard
+    rows.sort(key=lambda r: r["called_at"], reverse=True)
+    return rows
 
 
 # --------------------------------------------------------------------------- #
