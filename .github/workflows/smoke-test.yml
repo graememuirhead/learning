@@ -1,129 +1,44 @@
-name: Smoke Test 1 – New passes
+name: Smoke Tests
 
 on:
   workflow_dispatch:
-
-env:
-  PYTHON_VERSION: '3.11'
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'prod'
+        type: choice
+        options:
+          - prod
+          - dev
 
 jobs:
-  smoke_test:
-    name: Smoke Test 1
+  smoke:
+    name: Smoke Tests (${{ github.event.inputs.environment }})
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python ${{ env.PYTHON_VERSION }}
+      - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          python-version: '3.11'
 
-      - name: Install test dependencies
+      - name: Install dependencies
         run: pip install -r requirements-test.txt requests
 
-      - name: Azure CLI Login
+      - name: Set function URL
         run: |
-          az login --service-principal \
-            --username ${{ secrets.AZURE_CLIENT_ID }} \
-            --password ${{ secrets.AZURE_CLIENT_SECRET }} \
-            --tenant ${{ secrets.AZURE_TENANT_ID }}
-          az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          if [ "${{ github.event.inputs.environment }}" = "prod" ]; then
+            echo "SMOKE_FUNCTION_URL=https://ryetri-prod-func.azurewebsites.net/api" >> $GITHUB_ENV
+          else
+            echo "SMOKE_FUNCTION_URL=https://ryetri-dev-func.azurewebsites.net/api" >> $GITHUB_ENV
+          fi
 
-      - name: Get dev function key
-        run: |
-          KEY=$(az functionapp keys list \
-            --name ryetri-dev-func \
-            --resource-group ryetri-dev-rg \
-            --query 'functionKeys.default' -o tsv)
-          echo "DEV_FUNCTION_KEY=$KEY" >> $GITHUB_ENV
-
-      - name: Verify SendGrid API key works
-        continue-on-error: true
+      - name: Run smoke test #1 (welcome email via webhook)
         env:
-          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
-        run: |
-          python - <<'EOF'
-          import os, sys, json
-          import urllib.request, urllib.error
-
-          key = os.environ.get("SENDGRID_API_KEY", "")
-          if not key:
-              print("ERROR: SENDGRID_API_KEY secret is not set")
-              sys.exit(1)
-
-          payload = json.dumps({
-              "personalizations": [{"to": [{"email": "graeme@ryetriclub.com"}]}],
-              "from": {"email": "membership@ryetriclub.com", "name": "Rye Tri Club"},
-              "subject": "Rye Tri – smoke test (direct SendGrid)",
-              "content": [{"type": "text/plain", "value": "This is a direct SendGrid smoke test."}],
-          }).encode()
-
-          req = urllib.request.Request(
-              "https://api.sendgrid.com/v3/mail/send",
-              data=payload,
-              headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-              method="POST",
-          )
-          try:
-              with urllib.request.urlopen(req) as r:
-                  print(f"SendGrid accepted email: HTTP {r.status}")
-          except urllib.error.HTTPError as e:
-              body = e.read().decode()
-              print(f"SendGrid rejected email: HTTP {e.code} — {body}")
-              sys.exit(1)
-          EOF
-
-      - name: Test Google pass creation directly
-        run: |
-          python - <<'EOF'
-          import os, sys, json, uuid
-          import urllib.request, urllib.error
-
-          func_url = "https://ryetri-dev-func.azurewebsites.net/api"
-          func_key = os.environ.get("DEV_FUNCTION_KEY", "")
-          if not func_key:
-              print("ERROR: DEV_FUNCTION_KEY not available")
-              sys.exit(1)
-
-          # Use a unique member number each run so we always get a fresh pass
-          unique_member = f"SMOKE-{uuid.uuid4().hex[:8].upper()}"
-
-          payload = json.dumps({
-              "name": "Smoke Test Google",
-              "email": "graeme@ryetriclub.com",
-              "member_number": unique_member,
-              "expiry_date": "2099-12-31",
-              "wallet_type": "google",
-          }).encode()
-
-          req = urllib.request.Request(
-              f"{func_url}/create-pass",
-              data=payload,
-              headers={
-                  "x-functions-key": func_key,
-                  "Content-Type": "application/json",
-              },
-              method="POST",
-          )
-          try:
-              with urllib.request.urlopen(req) as r:
-                  body = r.read().decode()
-                  data = json.loads(body)
-                  url = data.get("pass_url", "")
-                  print(f"Google pass created OK: HTTP {r.status}")
-                  print(f"pass_url length: {len(url)} chars")
-                  print(f"")
-                  print(f"Open this URL on your phone to inspect the pass:")
-                  print(f"{url}")
-          except urllib.error.HTTPError as e:
-              body = e.read().decode()
-              print(f"Google pass creation FAILED: HTTP {e.code}")
-              print(f"Response: {body[:1000]}")
-              sys.exit(1)
-          EOF
-
-      - name: Send new passes via webhook
-        env:
-          DEV_FUNCTION_URL: https://ryetri-dev-func.azurewebsites.net/api
+          DEV_FUNCTION_URL: ${{ env.SMOKE_FUNCTION_URL }}
           DEV_WEBHOOK_SECRET: ${{ secrets.WILD_APRICOT_WEBHOOK_SECRET }}
-        run: pytest tests/integration/test_smoke_email.py::test_smoke_welcome_email -v -m smoke -s
+        run: |
+          pytest tests/integration/test_smoke_email.py::test_smoke_welcome_email \
+            -v -m smoke -s
