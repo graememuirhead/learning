@@ -56,3 +56,8 @@ jobs:
         run: |
           pytest tests/integration/test_smoke_email.py::test_smoke_welcome_email \
             -v -m smoke -s
+
+      - name: Run smoke test #2 (reissue pass)
+        run: |
+          pytest tests/integration/test_smoke_email.py::test_smoke_reissue_pass \
+            -v -m smoke -s
