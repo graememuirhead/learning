@@ -94,6 +94,19 @@ variable "wild_apricot_webhook_secret" {
   sensitive   = true
 }
 
+variable "wild_apricot_api_key" {
+  description = "Wild Apricot API key for fetching contact details"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "wild_apricot_account_id" {
+  description = "Wild Apricot account ID (numeric, visible in webhook payloads)"
+  type        = string
+  default     = "530477"
+}
+
 variable "from_email" {
   description = "Sender address for welcome emails"
   type        = string

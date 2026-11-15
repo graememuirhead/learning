@@ -46,6 +46,7 @@ from passes.google_pass import build_save_url
 from storage import database as db
 
 from notifications.email import send_welcome_email
+from integrations.wild_apricot import get_contact as wa_get_contact
 
 logger = logging.getLogger(__name__)
 
@@ -480,38 +481,119 @@ def wild_apricot_webhook(req: func.HttpRequest) -> func.HttpResponse:
     except ValueError:
         return func.HttpResponse("Invalid JSON", status_code=400)
 
-    event_type = body.get("EventType", "")
-    logger.info("wild-apricot-webhook event_type=%s", event_type)
+    # Wild Apricot sends two different payload shapes:
+    #
+    # Shape A (real webhook): MessageType + Parameters with flat dot-notation keys
+    #   { "MessageType": "Membership", "AccountId": "530477",
+    #     "Parameters": { "Action": "StatusChanged", "Contact.Id": "99888561",
+    #                     "Membership.Status": "20" } }
+    #
+    # Shape B (smoke-test / legacy): EventType + Parameters.Contact object
+    #   { "EventType": "MembershipActivated", "AccountId": 123456,
+    #     "Parameters": { "Contact": { "FirstName": ..., "Email": ..., ... } } }
 
-    if event_type not in ("MembershipActivated", "MembershipRenewed"):
-        # Acknowledge silently — we don't process other event types
+    params = body.get("Parameters", {})
+    raw_payload_str = json.dumps(body)[:2000]
+
+    # --- Determine which shape we received ---
+    message_type = body.get("MessageType", "")
+    event_type = body.get("EventType", "")
+
+    if message_type == "Membership":
+        # Shape A — real Wild Apricot webhook
+        action_field = params.get("Action", "")
+        if action_field != "StatusChanged":
+            logger.info("wild-apricot-webhook ignoring action=%s", action_field)
+            db.log_api_call(
+                endpoint="webhook/wild-apricot",
+                event_type=f"Membership/{action_field}",
+                action="ignored",
+                result="ok",
+                raw_payload=raw_payload_str,
+            )
+            return func.HttpResponse(status_code=200)
+
+        contact_id = str(params.get("Contact.Id") or "").strip()
+        account_id = str(body.get("AccountId") or Settings.WILD_APRICOT_ACCOUNT_ID).strip()
+
+        if not contact_id:
+            logger.error("wild-apricot-webhook: no Contact.Id in payload")
+            db.log_api_call(
+                endpoint="webhook/wild-apricot",
+                event_type="Membership/StatusChanged",
+                action="rejected",
+                result="error",
+                error_message="No Contact.Id in payload",
+                raw_payload=raw_payload_str,
+            )
+            return func.HttpResponse("Missing Contact.Id", status_code=422)
+
+        # Fetch full contact details from Wild Apricot API
+        try:
+            contact_data = wa_get_contact(account_id, contact_id)
+        except Exception as exc:
+            logger.exception("wild-apricot-webhook: failed to fetch contact %s", contact_id)
+            db.log_api_call(
+                endpoint="webhook/wild-apricot",
+                member_number=contact_id,
+                event_type="Membership/StatusChanged",
+                action="rejected",
+                result="error",
+                error_message=f"WA API error: {exc}",
+                raw_payload=raw_payload_str,
+            )
+            return func.HttpResponse("Failed to fetch member details", status_code=502)
+
+        # Only issue passes for Active members
+        if contact_data["status"] != "Active":
+            logger.info(
+                "wild-apricot-webhook: contact=%s status=%s — not issuing pass",
+                contact_id, contact_data["status"],
+            )
+            db.log_api_call(
+                endpoint="webhook/wild-apricot",
+                member_number=contact_id,
+                email=contact_data["email"],
+                event_type="Membership/StatusChanged",
+                action="ignored",
+                result="ok",
+                error_message=f"Status is {contact_data['status']}, not Active",
+                raw_payload=raw_payload_str,
+            )
+            return func.HttpResponse(status_code=200)
+
+        name = contact_data["name"]
+        email = contact_data["email"]
+        member_number = contact_id
+        expiry_date = contact_data["expiry_date"]
+        event_type = "MembershipActivated"  # normalise for the rest of the handler
+
+    elif event_type in ("MembershipActivated", "MembershipRenewed"):
+        # Shape B — smoke-test / legacy format with full contact in payload
+        contact = params.get("Contact", {})
+        first_name = (contact.get("FirstName") or "").strip()
+        last_name = (contact.get("LastName") or "").strip()
+        name = f"{first_name} {last_name}".strip()
+        email = (contact.get("Email") or "").strip().lower()
+        member_number = str(contact.get("Id") or "")
+        renewal_due = (contact.get("RenewalDue") or "")
+        expiry_date = renewal_due[:10] if renewal_due else ""
+
+    else:
+        logger.info("wild-apricot-webhook ignoring message_type=%r event_type=%r", message_type, event_type)
         db.log_api_call(
             endpoint="webhook/wild-apricot",
-            event_type=event_type,
+            event_type=event_type or message_type,
             action="ignored",
             result="ok",
-            raw_payload=json.dumps(body)[:2000],
+            raw_payload=raw_payload_str,
         )
         return func.HttpResponse(status_code=200)
-
-    # Wild Apricot payload: { EventType, AccountId, Parameters: { Contact: {...} } }
-    params = body.get("Parameters", {})
-    contact = params.get("Contact", {})
-
-    first_name = (contact.get("FirstName") or "").strip()
-    last_name = (contact.get("LastName") or "").strip()
-    name = f"{first_name} {last_name}".strip()
-    email = (contact.get("Email") or "").strip().lower()
-    member_number = str(contact.get("Id") or "")
-
-    # RenewalDue is ISO 8601 datetime — take just the date part
-    renewal_due = (contact.get("RenewalDue") or "")
-    expiry_date = renewal_due[:10] if renewal_due else ""
 
     if not all([name, email, member_number, expiry_date]):
         logger.error(
             "wild-apricot-webhook: missing fields name=%r email=%r "
-            "member_number=%r expiry=%r — raw payload logged at DEBUG",
+            "member_number=%r expiry=%r",
             bool(name), bool(email), bool(member_number), bool(expiry_date),
         )
         db.log_api_call(
@@ -520,7 +602,7 @@ def wild_apricot_webhook(req: func.HttpRequest) -> func.HttpResponse:
             action="rejected",
             result="error",
             error_message=f"Missing fields: name={bool(name)} email={bool(email)} member={bool(member_number)} expiry={bool(expiry_date)}",
-            raw_payload=json.dumps(body)[:2000],
+            raw_payload=raw_payload_str,
         )
         return func.HttpResponse("Missing required member fields", status_code=422)
 

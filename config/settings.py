@@ -100,8 +100,10 @@ class Settings:
     FROM_EMAIL: str = os.environ.get("FROM_EMAIL", "membership@ryetriclub.com")
     STATIC_WEBSITE_URL: str = os.environ.get("STATIC_WEBSITE_URL", "")
 
-    # ---- Wild Apricot webhook ----
+    # ---- Wild Apricot ----
     WILD_APRICOT_WEBHOOK_SECRET: str = os.environ.get("WILD_APRICOT_WEBHOOK_SECRET", "")
+    WILD_APRICOT_API_KEY: str = os.environ.get("WILD_APRICOT_API_KEY", "")
+    WILD_APRICOT_ACCOUNT_ID: str = os.environ.get("WILD_APRICOT_ACCOUNT_ID", "530477")
 
     # ---- Logo ----
     LOGO_FILENAME: str = os.environ.get("LOGO_FILENAME", "logo.png")
