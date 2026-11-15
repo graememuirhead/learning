@@ -276,7 +276,7 @@ jobs:
   e2e_test:
     name: E2E Tests
     runs-on: ubuntu-latest
-    needs: [infrastructure, deploy_static]
+    needs: [infrastructure, deploy_static, integration_test]
     steps:
       - uses: actions/checkout@v4
 
