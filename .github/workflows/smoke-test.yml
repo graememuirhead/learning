@@ -27,17 +27,31 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements-test.txt requests
 
-      - name: Set function URL
+      - name: Azure CLI Login
+        run: |
+          az login --service-principal \
+            --username ${{ secrets.AZURE_CLIENT_ID }} \
+            --password ${{ secrets.AZURE_CLIENT_SECRET }} \
+            --tenant ${{ secrets.AZURE_TENANT_ID }}
+          az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Set function URL and key
         run: |
           if [ "${{ github.event.inputs.environment }}" = "prod" ]; then
-            echo "SMOKE_FUNCTION_URL=https://ryetri-prod-func.azurewebsites.net/api" >> $GITHUB_ENV
+            FUNC_APP="ryetri-prod-func"
           else
-            echo "SMOKE_FUNCTION_URL=https://ryetri-dev-func.azurewebsites.net/api" >> $GITHUB_ENV
+            FUNC_APP="ryetri-dev-func"
           fi
+          RG="${FUNC_APP%-func}-rg"
+          echo "DEV_FUNCTION_URL=https://${FUNC_APP}.azurewebsites.net/api" >> $GITHUB_ENV
+          KEY=$(az functionapp keys list \
+            --name "$FUNC_APP" \
+            --resource-group "$RG" \
+            --query 'functionKeys.default' -o tsv)
+          echo "DEV_FUNCTION_KEY=$KEY" >> $GITHUB_ENV
 
       - name: Run smoke test #1 (welcome email via webhook)
         env:
-          DEV_FUNCTION_URL: ${{ env.SMOKE_FUNCTION_URL }}
           DEV_WEBHOOK_SECRET: ${{ secrets.WILD_APRICOT_WEBHOOK_SECRET }}
         run: |
           pytest tests/integration/test_smoke_email.py::test_smoke_welcome_email \
