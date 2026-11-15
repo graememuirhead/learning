@@ -8,32 +8,30 @@ jobs:
     name: Replay webhook for contact 99886401
     runs-on: ubuntu-latest
     steps:
-      - name: Send StatusChanged (Status 1) — expect no email
-        env:
-          SECRET: ${{ secrets.WILD_APRICOT_WEBHOOK_SECRET }}
-        run: |
-          echo "=== StatusChanged Status 1 ==="
-          curl -s -w "\nHTTP %{http_code}" -X POST \
-            "https://ryetri-prod-func.azurewebsites.net/api/webhook/wild-apricot?secret=${SECRET}" \
-            -H "Content-Type: application/json" \
-            -d '{"AccountId":"530477","MessageType":"Membership","Parameters":{"Action":"StatusChanged","Contact.Id":"99886401","Membership.LevelId":"1828218","Membership.Status":"1"}}'
+      - name: Install requests
+        run: pip install requests
 
-      - name: Send RenewalDateChanged — expect no email
+      - name: Replay all three payloads
         env:
           SECRET: ${{ secrets.WILD_APRICOT_WEBHOOK_SECRET }}
         run: |
-          echo "=== RenewalDateChanged ==="
-          curl -s -w "\nHTTP %{http_code}" -X POST \
-            "https://ryetri-prod-func.azurewebsites.net/api/webhook/wild-apricot?secret=${SECRET}" \
-            -H "Content-Type: application/json" \
-            -d '{"AccountId":"530477","MessageType":"Membership","Parameters":{"Action":"RenewalDateChanged","Contact.Id":"99886401","Membership.LevelId":"1828218","Membership.Status":"0"}}'
+          python3 << 'EOF'
+          import os, requests
 
-      - name: Send StatusChanged (Status 20) — expect email
-        env:
-          SECRET: ${{ secrets.WILD_APRICOT_WEBHOOK_SECRET }}
-        run: |
-          echo "=== StatusChanged Status 20 (Active) — should trigger pass + email ==="
-          curl -s -w "\nHTTP %{http_code}" -X POST \
-            "https://ryetri-prod-func.azurewebsites.net/api/webhook/wild-apricot?secret=${SECRET}" \
-            -H "Content-Type: application/json" \
-            -d '{"AccountId":"530477","MessageType":"Membership","Parameters":{"Action":"StatusChanged","Contact.Id":"99886401","Membership.LevelId":"1828218","Membership.Status":"20"}}'
+          secret = os.environ["SECRET"]
+          url = f"https://ryetri-prod-func.azurewebsites.net/api/webhook/wild-apricot?secret={secret}"
+
+          payloads = [
+              ("StatusChanged Status 1 — expect no email",
+               {"AccountId":"530477","MessageType":"Membership","Parameters":{"Action":"StatusChanged","Contact.Id":"99886401","Membership.LevelId":"1828218","Membership.Status":"1"}}),
+              ("RenewalDateChanged — expect no email",
+               {"AccountId":"530477","MessageType":"Membership","Parameters":{"Action":"RenewalDateChanged","Contact.Id":"99886401","Membership.LevelId":"1828218","Membership.Status":"0"}}),
+              ("StatusChanged Status 20 — expect pass + email",
+               {"AccountId":"530477","MessageType":"Membership","Parameters":{"Action":"StatusChanged","Contact.Id":"99886401","Membership.LevelId":"1828218","Membership.Status":"20"}}),
+          ]
+
+          for label, body in payloads:
+              resp = requests.post(url, json=body, timeout=60)
+              print(f"\n=== {label} ===")
+              print(f"HTTP {resp.status_code}: {resp.text[:200] or '(empty)'}")
+          EOF
