@@ -45,7 +45,7 @@ from passes.apple_pass import build_pkpass
 from passes.google_pass import build_save_url
 from storage import database as db
 
-from notifications.email import send_welcome_email
+from notifications.email import send_members_report_email, send_welcome_email
 from integrations.wild_apricot import get_contact as wa_get_contact
 
 logger = logging.getLogger(__name__)
@@ -1061,3 +1061,20 @@ def _internal_error(message: str) -> func.HttpResponse:
         status_code=500,
         mimetype="application/json",
     )
+
+
+# ---------------------------------------------------------------------------
+# Weekly members report — every Thursday at 1 pm EST (18:00 UTC)
+# ---------------------------------------------------------------------------
+@app.timer_trigger(
+    schedule="0 0 18 * * 4",
+    arg_name="timer",
+    run_on_startup=False,
+    use_monitor=True,
+)
+def weekly_members_report(timer: func.TimerRequest) -> None:
+    """Email a CSV of all active members to board@ryetriclub.com every Thursday."""
+    logger.info("weekly-members-report starting")
+    members = db.list_active_members()
+    sent = send_members_report_email(members)
+    logger.info("weekly-members-report done count=%d email_sent=%s", len(members), sent)

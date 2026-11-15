@@ -1,7 +1,11 @@
 """Welcome email via SendGrid."""
 from __future__ import annotations
 
+import base64
+import csv
+import io
 import logging
+from datetime import datetime, timezone
 from typing import Optional
 
 from config.settings import Settings
@@ -36,6 +40,49 @@ def send_welcome_email(
         return response.status_code in (200, 202)
     except Exception:
         logger.exception("Failed to send welcome email to %s", email)
+        return False
+
+
+def send_members_report_email(members: list[dict]) -> bool:
+    """Send the weekly active-members CSV report to the board. Returns True on success."""
+    if not Settings.SENDGRID_API_KEY:
+        logger.warning("SENDGRID_API_KEY not set — skipping members report email")
+        return False
+    try:
+        from sendgrid import SendGridAPIClient
+        from sendgrid.helpers.mail import Attachment, Disposition, FileContent, FileName, FileType, Mail
+
+        # Build CSV
+        buf = io.StringIO()
+        writer = csv.DictWriter(buf, fieldnames=["name", "email", "member_number", "expiry_date"])
+        writer.writeheader()
+        writer.writerows(members)
+        csv_bytes = buf.getvalue().encode()
+
+        date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        attachment = Attachment(
+            FileContent(base64.b64encode(csv_bytes).decode()),
+            FileName(f"rye-tri-active-members-{date_str}.csv"),
+            FileType("text/csv"),
+            Disposition("attachment"),
+        )
+
+        message = Mail(
+            from_email=Settings.FROM_EMAIL,
+            to_emails="board@ryetriclub.com",
+            subject=f"Rye Tri Club — Active Members Report ({date_str})",
+            plain_text_content=(
+                "Please see enclosed of active members with issued membership cards.\n\n"
+                f"Total active members: {len(members)}\n"
+            ),
+        )
+        message.attachment = attachment
+
+        response = SendGridAPIClient(Settings.SENDGRID_API_KEY).send(message)
+        logger.info("Members report email sent status=%d count=%d", response.status_code, len(members))
+        return response.status_code in (200, 202)
+    except Exception:
+        logger.exception("Failed to send members report email")
         return False
 
 
