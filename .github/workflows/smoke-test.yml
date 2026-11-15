@@ -1,0 +1,63 @@
+name: Smoke Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'prod'
+        type: choice
+        options:
+          - prod
+          - dev
+
+jobs:
+  smoke:
+    name: Smoke Tests (${{ github.event.inputs.environment }})
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements-test.txt requests
+
+      - name: Azure CLI Login
+        run: |
+          az login --service-principal \
+            --username ${{ secrets.AZURE_CLIENT_ID }} \
+            --password ${{ secrets.AZURE_CLIENT_SECRET }} \
+            --tenant ${{ secrets.AZURE_TENANT_ID }}
+          az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Set function URL and key
+        run: |
+          if [ "${{ github.event.inputs.environment }}" = "prod" ]; then
+            FUNC_APP="ryetri-prod-func"
+          else
+            FUNC_APP="ryetri-dev-func"
+          fi
+          RG="${FUNC_APP%-func}-rg"
+          echo "DEV_FUNCTION_URL=https://${FUNC_APP}.azurewebsites.net/api" >> $GITHUB_ENV
+          KEY=$(az functionapp keys list \
+            --name "$FUNC_APP" \
+            --resource-group "$RG" \
+            --query 'functionKeys.default' -o tsv)
+          echo "DEV_FUNCTION_KEY=$KEY" >> $GITHUB_ENV
+
+      - name: Run smoke test #1 (welcome email via webhook)
+        env:
+          DEV_WEBHOOK_SECRET: ${{ secrets.WILD_APRICOT_WEBHOOK_SECRET }}
+        run: |
+          pytest tests/integration/test_smoke_email.py::test_smoke_welcome_email \
+            -v -m smoke -s
+
+      - name: Run smoke test #2 (reissue pass)
+        run: |
+          pytest tests/integration/test_smoke_email.py::test_smoke_reissue_pass \
+            -v -m smoke -s

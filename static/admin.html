@@ -1,0 +1,301 @@
+<title>Rye Tri Admin</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+
+<style>
+  :root {
+    --navy:   #cc0000;
+    --navy-2: #aa0000;
+    --accent: #cc0000;
+    --bg:     #f1f4f9;
+    --card:   #ffffff;
+    --border: #dde3ee;
+    --label:  #64748b;
+    --text:   #1e293b;
+    --muted:  #94a3b8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:     #0f1623;
+      --card:   #1a2235;
+      --border: #2a3650;
+      --label:  #7a8fa8;
+      --text:   #e2e8f0;
+      --muted:  #4a5a72;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:     #0f1623;
+    --card:   #1a2235;
+    --border: #2a3650;
+    --label:  #7a8fa8;
+    --text:   #e2e8f0;
+    --muted:  #4a5a72;
+    color-scheme: dark;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding-block: 32px;
+    padding-left:  max(16px, env(safe-area-inset-left,  0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+
+  .card {
+    width: 100%;
+    max-width: 460px;
+    background: var(--card);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 4px 24px rgba(204, 0, 0, 0.10);
+  }
+
+  .header {
+    background: var(--navy);
+    padding: 22px 28px 18px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .header-icon {
+    font-size: 26px;
+    line-height: 1;
+  }
+  .header h1 { color: #fff; font-size: 18px; font-weight: 700; }
+  .header p  { color: #ffcccc; font-size: 12px; margin-top: 2px; letter-spacing: 1px; text-transform: uppercase; }
+
+  .body { padding: 28px; }
+
+  .section-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    margin-bottom: 12px;
+    margin-top: 20px;
+  }
+  .section-title:first-child { margin-top: 0; }
+
+  .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+  .field label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--label);
+  }
+  .field input {
+    width: 100%;
+    padding: 11px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    font-size: 15px;
+    font-family: inherit;
+    background: var(--card);
+    color: var(--text);
+    transition: border-color 0.15s;
+    outline: none;
+  }
+  .field input:focus { border-color: var(--accent); }
+  .field input::placeholder { color: var(--muted); }
+  .field .hint { font-size: 12px; color: var(--muted); }
+
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 20px 0;
+  }
+
+  .btn {
+    width: 100%;
+    margin-top: 8px;
+    padding: 13px;
+    background: var(--navy);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.15s, opacity 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .btn:hover { background: var(--navy-2); }
+  .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+  .spinner {
+    width: 16px; height: 16px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .alert {
+    display: flex;
+    gap: 12px;
+    padding: 14px;
+    border-radius: 8px;
+    font-size: 14px;
+    line-height: 1.5;
+    margin-top: 16px;
+  }
+  .alert-ok  { background: #f0fdf4; color: #15803d; border: 1.5px solid #bbf7d0; }
+  .alert-err { background: #fef2f2; color: #b91c1c; border: 1.5px solid #fecaca; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .alert-ok  { background: #052e16; color: #4ade80; border-color: #166534; }
+    :root:not([data-theme="light"]) .alert-err { background: #450a0a; color: #f87171; border-color: #991b1b; }
+  }
+  :root[data-theme="dark"] .alert-ok  { background: #052e16; color: #4ade80; border-color: #166534; }
+  :root[data-theme="dark"] .alert-err { background: #450a0a; color: #f87171; border-color: #991b1b; }
+
+  .icon { font-size: 18px; flex-shrink: 0; line-height: 1.4; }
+
+  @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
+</style>
+
+<div class="card">
+  <div class="header">
+    <span class="header-icon">&#x1F510;</span>
+    <div>
+      <h1>Rye Tri Admin</h1>
+      <p>Send membership card</p>
+    </div>
+  </div>
+
+  <div class="body">
+    <form id="form" novalidate>
+
+      <p class="section-title">Authentication</p>
+      <div class="field">
+        <label for="admin_secret">Admin password</label>
+        <input id="admin_secret" type="password" placeholder="Enter admin password" autocomplete="current-password" required>
+      </div>
+
+      <hr class="divider">
+
+      <p class="section-title">Member details</p>
+      <div class="field">
+        <label for="member_number">Membership number</label>
+        <input id="member_number" type="text" inputmode="numeric" placeholder="e.g. 99888561" autocomplete="off" required>
+        <span class="hint">If the member exists in the database their name and expiry will be used automatically.</span>
+      </div>
+      <div class="field">
+        <label for="email">Email address</label>
+        <input id="email" type="email" inputmode="email" placeholder="member@example.com" autocomplete="off" required>
+      </div>
+
+      <hr class="divider">
+
+      <p class="section-title">Override (only needed for new members not yet in the database)</p>
+      <div class="field">
+        <label for="name">Full name</label>
+        <input id="name" type="text" placeholder="e.g. Jane Smith" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="expiry_date">Membership expiry</label>
+        <input id="expiry_date" type="date" placeholder="YYYY-MM-DD" autocomplete="off">
+      </div>
+
+      <button class="btn" id="submit-btn" type="submit">
+        <span id="btn-text">Send membership card</span>
+      </button>
+    </form>
+
+    <div id="alert" hidden></div>
+  </div>
+</div>
+
+<script>
+  const API = '__API_BASE_URL__/manual-send-card';
+
+  const form     = document.getElementById('form');
+  const btn      = document.getElementById('submit-btn');
+  const alertBox = document.getElementById('alert');
+
+  function showAlert(type, icon, message) {
+    alertBox.className = 'alert alert-' + type;
+    alertBox.innerHTML = `<span class="icon">${icon}</span><span>${message}</span>`;
+    alertBox.hidden = false;
+  }
+
+  function setLoading(loading) {
+    btn.disabled = loading;
+    const existing = document.getElementById('spin');
+    if (loading && !existing) {
+      const spin = document.createElement('span');
+      spin.className = 'spinner';
+      spin.id = 'spin';
+      btn.appendChild(spin);
+    } else if (!loading && existing) {
+      existing.remove();
+    }
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    alertBox.hidden = true;
+
+    const admin_secret  = document.getElementById('admin_secret').value.trim();
+    const member_number = document.getElementById('member_number').value.trim();
+    const email         = document.getElementById('email').value.trim();
+    const name          = document.getElementById('name').value.trim();
+    const expiry_date   = document.getElementById('expiry_date').value.trim();
+
+    if (!admin_secret || !member_number || !email) {
+      showAlert('err', '&#x26A0;&#xFE0F;', 'Admin password, membership number and email are required.');
+      return;
+    }
+
+    const body = { admin_secret, member_number, email };
+    if (name)        body.name        = name;
+    if (expiry_date) body.expiry_date = expiry_date;
+
+    setLoading(true);
+    try {
+      const res = await fetch(API, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(body),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (res.ok) {
+        showAlert('ok', '&#x2705;',
+          `Done! Card sent to ${email}. ` + (data.message || ''));
+        form.reset();
+      } else if (res.status === 401) {
+        showAlert('err', '&#x274C;', 'Incorrect admin password.');
+      } else if (res.status === 404) {
+        showAlert('err', '&#x274C;',
+          'Member not found in the database. ' +
+          'Fill in the Name and Expiry date fields to create them from scratch.');
+      } else {
+        showAlert('err', '&#x26A0;&#xFE0F;',
+          (data.error || 'Something went wrong. Check the API call log for details.'));
+      }
+    } catch {
+      showAlert('err', '&#x26A0;&#xFE0F;', 'Could not reach the server. Check your internet connection.');
+    } finally {
+      setLoading(false);
+    }
+  });
+</script>

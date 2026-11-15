@@ -75,9 +75,15 @@ class Settings:
     @staticmethod
     def get_google_service_account() -> dict:
         """Return parsed Google service account JSON."""
-        b64 = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON", "")
-        if b64:
-            return json.loads(base64.b64decode(b64))
+        value = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON", "")
+        if value:
+            stripped = value.strip()
+            # Accept raw JSON directly (no base64 needed)
+            if stripped.startswith("{"):
+                return json.loads(stripped)
+            # Otherwise treat as base64 (add padding if missing)
+            stripped += "=" * (-len(stripped) % 4)
+            return json.loads(base64.b64decode(stripped))
         sa_file = ASSETS_DIR / "google_service_account.json"
         if sa_file.exists():
             return json.loads(sa_file.read_text())
@@ -92,9 +98,15 @@ class Settings:
     # ---- Notifications ----
     SENDGRID_API_KEY: str = os.environ.get("SENDGRID_API_KEY", "")
     FROM_EMAIL: str = os.environ.get("FROM_EMAIL", "membership@ryetriclub.com")
+    STATIC_WEBSITE_URL: str = os.environ.get("STATIC_WEBSITE_URL", "")
 
-    # ---- Wild Apricot webhook ----
+    # ---- Admin ----
+    ADMIN_SECRET: str = os.environ.get("ADMIN_SECRET", "")
+
+    # ---- Wild Apricot ----
     WILD_APRICOT_WEBHOOK_SECRET: str = os.environ.get("WILD_APRICOT_WEBHOOK_SECRET", "")
+    WILD_APRICOT_API_KEY: str = os.environ.get("WILD_APRICOT_API_KEY", "")
+    WILD_APRICOT_ACCOUNT_ID: str = os.environ.get("WILD_APRICOT_ACCOUNT_ID", "530477")
 
     # ---- Logo ----
     LOGO_FILENAME: str = os.environ.get("LOGO_FILENAME", "logo.png")

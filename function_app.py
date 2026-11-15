@@ -46,6 +46,7 @@ from passes.google_pass import build_save_url
 from storage import database as db
 
 from notifications.email import send_welcome_email
+from integrations.wild_apricot import get_contact as wa_get_contact
 
 logger = logging.getLogger(__name__)
 
@@ -480,34 +481,144 @@ def wild_apricot_webhook(req: func.HttpRequest) -> func.HttpResponse:
     except ValueError:
         return func.HttpResponse("Invalid JSON", status_code=400)
 
-    event_type = body.get("EventType", "")
-    logger.info("wild-apricot-webhook event_type=%s", event_type)
+    # Wild Apricot sends two different payload shapes:
+    #
+    # Shape A (real webhook): MessageType + Parameters with flat dot-notation keys
+    #   { "MessageType": "Membership", "AccountId": "530477",
+    #     "Parameters": { "Action": "StatusChanged", "Contact.Id": "99888561",
+    #                     "Membership.Status": "20" } }
+    #
+    # Shape B (smoke-test / legacy): EventType + Parameters.Contact object
+    #   { "EventType": "MembershipActivated", "AccountId": 123456,
+    #     "Parameters": { "Contact": { "FirstName": ..., "Email": ..., ... } } }
 
-    if event_type not in ("MembershipActivated", "MembershipRenewed"):
-        # Acknowledge silently — we don't process other event types
-        return func.HttpResponse(status_code=200)
-
-    # Wild Apricot payload: { EventType, AccountId, Parameters: { Contact: {...} } }
     params = body.get("Parameters", {})
-    contact = params.get("Contact", {})
+    raw_payload_str = json.dumps(body)[:2000]
 
-    first_name = (contact.get("FirstName") or "").strip()
-    last_name = (contact.get("LastName") or "").strip()
-    name = f"{first_name} {last_name}".strip()
-    email = (contact.get("Email") or "").strip().lower()
-    member_number = str(contact.get("Id") or "")
+    # --- Determine which shape we received ---
+    message_type = body.get("MessageType", "")
+    event_type = body.get("EventType", "")
 
-    # RenewalDue is ISO 8601 datetime — take just the date part
-    renewal_due = (contact.get("RenewalDue") or "")
-    expiry_date = renewal_due[:10] if renewal_due else ""
+    if message_type == "TestWebhook":
+        logger.info("wild-apricot-webhook: test ping received from account=%s", body.get("AccountId"))
+        db.log_api_call(
+            endpoint="webhook/wild-apricot",
+            event_type="TestWebhook",
+            action="ping",
+            result="ok",
+            raw_payload=raw_payload_str,
+        )
+        return func.HttpResponse(
+            json.dumps({"status": "ok", "message": "Rye Tri membership API is reachable."}),
+            status_code=200,
+            mimetype="application/json",
+        )
+
+    if message_type == "Membership":
+        # Shape A — real Wild Apricot webhook
+        action_field = params.get("Action", "")
+        if action_field != "StatusChanged":
+            logger.info("wild-apricot-webhook ignoring action=%s", action_field)
+            db.log_api_call(
+                endpoint="webhook/wild-apricot",
+                event_type=f"Membership/{action_field}",
+                action="ignored",
+                result="ok",
+                raw_payload=raw_payload_str,
+            )
+            return func.HttpResponse(status_code=200)
+
+        contact_id = str(params.get("Contact.Id") or "").strip()
+        account_id = str(body.get("AccountId") or Settings.WILD_APRICOT_ACCOUNT_ID).strip()
+
+        if not contact_id:
+            logger.error("wild-apricot-webhook: no Contact.Id in payload")
+            db.log_api_call(
+                endpoint="webhook/wild-apricot",
+                event_type="Membership/StatusChanged",
+                action="rejected",
+                result="error",
+                error_message="No Contact.Id in payload",
+                raw_payload=raw_payload_str,
+            )
+            return func.HttpResponse("Missing Contact.Id", status_code=422)
+
+        # Fetch full contact details from Wild Apricot API
+        try:
+            contact_data = wa_get_contact(account_id, contact_id)
+        except Exception as exc:
+            logger.exception("wild-apricot-webhook: failed to fetch contact %s", contact_id)
+            db.log_api_call(
+                endpoint="webhook/wild-apricot",
+                member_number=contact_id,
+                event_type="Membership/StatusChanged",
+                action="rejected",
+                result="error",
+                error_message=f"WA API error: {exc}",
+                raw_payload=raw_payload_str,
+            )
+            return func.HttpResponse("Failed to fetch member details", status_code=502)
+
+        # Only issue passes for Active members
+        if contact_data["status"] != "Active":
+            logger.info(
+                "wild-apricot-webhook: contact=%s status=%s — not issuing pass",
+                contact_id, contact_data["status"],
+            )
+            db.log_api_call(
+                endpoint="webhook/wild-apricot",
+                member_number=contact_id,
+                email=contact_data["email"],
+                event_type="Membership/StatusChanged",
+                action="ignored",
+                result="ok",
+                error_message=f"Status is {contact_data['status']}, not Active",
+                raw_payload=raw_payload_str,
+            )
+            return func.HttpResponse(status_code=200)
+
+        name = contact_data["name"]
+        email = contact_data["email"]
+        member_number = contact_id
+        expiry_date = contact_data["expiry_date"]
+        event_type = "MembershipActivated"  # normalise for the rest of the handler
+
+    elif event_type in ("MembershipActivated", "MembershipRenewed"):
+        # Shape B — smoke-test / legacy format with full contact in payload
+        contact = params.get("Contact", {})
+        first_name = (contact.get("FirstName") or "").strip()
+        last_name = (contact.get("LastName") or "").strip()
+        name = f"{first_name} {last_name}".strip()
+        email = (contact.get("Email") or "").strip().lower()
+        member_number = str(contact.get("Id") or "")
+        renewal_due = (contact.get("RenewalDue") or "")
+        expiry_date = renewal_due[:10] if renewal_due else ""
+
+    else:
+        logger.info("wild-apricot-webhook ignoring message_type=%r event_type=%r", message_type, event_type)
+        db.log_api_call(
+            endpoint="webhook/wild-apricot",
+            event_type=event_type or message_type,
+            action="ignored",
+            result="ok",
+            raw_payload=raw_payload_str,
+        )
+        return func.HttpResponse(status_code=200)
 
     if not all([name, email, member_number, expiry_date]):
         logger.error(
             "wild-apricot-webhook: missing fields name=%r email=%r "
-            "member_number=%r expiry=%r — raw payload logged at DEBUG",
+            "member_number=%r expiry=%r",
             bool(name), bool(email), bool(member_number), bool(expiry_date),
         )
-        logger.debug("wild-apricot-webhook raw payload: %s", json.dumps(body)[:2000])
+        db.log_api_call(
+            endpoint="webhook/wild-apricot",
+            event_type=event_type,
+            action="rejected",
+            result="error",
+            error_message=f"Missing fields: name={bool(name)} email={bool(email)} member={bool(member_number)} expiry={bool(expiry_date)}",
+            raw_payload=raw_payload_str,
+        )
         return func.HttpResponse("Missing required member fields", status_code=422)
 
     logger.info(
@@ -550,13 +661,30 @@ def wild_apricot_webhook(req: func.HttpRequest) -> func.HttpResponse:
                 wallet_type, member_number,
             )
 
+    email_sent = False
     if apple_pass_url or google_save_url:
-        send_welcome_email(name, email, member_number, expiry_date, apple_pass_url, google_save_url)
+        try:
+            send_welcome_email(name, email, member_number, expiry_date, apple_pass_url, google_save_url)
+            email_sent = True
+        except Exception:
+            logger.exception("wild-apricot-webhook: failed to send email for member=%s", member_number)
     else:
         logger.error(
             "wild-apricot-webhook: both pass types failed for member=%s — no email sent",
             member_number,
         )
+
+    db.log_api_call(
+        endpoint="webhook/wild-apricot",
+        member_number=member_number,
+        email=email,
+        event_type=event_type,
+        action="passes_issued" if (apple_pass_url or google_save_url) else "passes_failed",
+        result="success" if (apple_pass_url or google_save_url) else "error",
+        error_message="" if (apple_pass_url or google_save_url) else "Both pass types failed",
+        email_sent=email_sent,
+        raw_payload=json.dumps(body)[:2000],
+    )
 
     return func.HttpResponse(status_code=200)
 
@@ -646,10 +774,159 @@ def reissue_pass(req: func.HttpRequest) -> func.HttpResponse:
         except Exception:
             logger.exception("reissue-pass: google pass failed for member=%s", member_number)
 
+    email_sent = False
     if apple_pass_url or google_save_url:
-        send_welcome_email(name, email, member_number, expiry_date, apple_pass_url, google_save_url)
+        try:
+            send_welcome_email(name, email, member_number, expiry_date, apple_pass_url, google_save_url)
+            email_sent = True
+        except Exception:
+            logger.exception("reissue-pass: failed to send email for member=%s", member_number)
 
-    return _ok({"message": "Your membership card has been reissued. Check your email for the new link."})
+    db.log_api_call(
+        endpoint="reissue-pass",
+        member_number=member_number,
+        email=email,
+        event_type="reissue",
+        action="passes_reissued" if (apple_pass_url or google_save_url) else "passes_failed",
+        result="success" if (apple_pass_url or google_save_url) else "error",
+        email_sent=email_sent,
+    )
+
+    result_body: dict = {"message": "Your membership card has been reissued. Check your email for the new link."}
+    if apple_pass_url:
+        result_body["apple_pass_url"] = apple_pass_url
+    if google_save_url:
+        result_body["google_save_url"] = google_save_url
+    result_body["email_sent"] = email_sent
+    return _ok(result_body)
+
+
+# =========================================================================== #
+# POST /api/admin/send-card  – admin: manually send a membership card
+# =========================================================================== #
+
+@app.route(route="manual-send-card", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+def admin_send_card(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    Admin endpoint: send (or resend) a membership card to any member.
+    Protected by ADMIN_SECRET — the caller must include it in the request body.
+
+    Body (JSON):
+        admin_secret   (required) – must match ADMIN_SECRET setting
+        member_number  (required) – club membership number
+        email          (required) – email address to send the card to
+        name           (optional) – full name; used only if member not in DB
+        expiry_date    (optional) – ISO date; used only if member not in DB
+    """
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _bad_request("Request body must be valid JSON.")
+
+    # Verify admin secret
+    provided = (body.get("admin_secret") or "").strip()
+    expected = Settings.ADMIN_SECRET.strip()
+    if not expected or not secrets.compare_digest(provided, expected):
+        logger.warning("admin/send-card: rejected unauthorised request")
+        return func.HttpResponse(
+            json.dumps({"error": "Unauthorised."}),
+            status_code=401,
+            mimetype="application/json",
+        )
+
+    member_number = _str(body, "member_number")
+    email = _str(body, "email").lower()
+    override_name = _str(body, "name")
+    override_expiry = _str(body, "expiry_date")
+
+    if not member_number or not email:
+        return _bad_request("'member_number' and 'email' are required.")
+
+    # Try to find existing passes
+    apple_pass = db.get_pass_by_member_number(member_number, "apple")
+    google_pass = db.get_pass_by_member_number(member_number, "google")
+    existing = apple_pass or google_pass
+
+    if existing:
+        name = existing.get("Name", override_name)
+        expiry_date = existing.get("ExpiryDate", override_expiry)
+    elif override_name and override_expiry:
+        name = override_name
+        expiry_date = override_expiry
+    else:
+        logger.warning("admin/send-card: member=%s not in DB and no name/expiry provided", member_number)
+        return func.HttpResponse(
+            json.dumps({"error": "Member not found. Provide 'name' and 'expiry_date' to create from scratch."}),
+            status_code=404,
+            mimetype="application/json",
+        )
+
+    if override_expiry and override_expiry != expiry_date:
+        expiry_date = override_expiry
+
+    request_id = str(uuid.uuid4())
+    logger.info("admin/send-card member=%s email=%s expiry=%s", member_number, email, expiry_date)
+
+    # Void existing passes and issue fresh ones
+    for wallet_type, pass_record in [("apple", apple_pass), ("google", google_pass)]:
+        if pass_record:
+            _expire_old_pass(pass_record["RowKey"], wallet_type)
+
+    apple_pass_url: Optional[str] = None
+    google_save_url: Optional[str] = None
+
+    for wallet_type in ("apple", "google"):
+        try:
+            url = _issue_new_pass(request_id, wallet_type, name, email, member_number, expiry_date)
+            if wallet_type == "apple":
+                apple_pass_url = url
+            else:
+                google_save_url = url
+        except Exception:
+            logger.exception("admin/send-card: %s pass failed for member=%s", wallet_type, member_number)
+
+    if apple_pass_url or google_save_url:
+        try:
+            send_welcome_email(name, email, member_number, expiry_date, apple_pass_url, google_save_url)
+        except Exception:
+            logger.exception("admin/send-card: email failed for member=%s", member_number)
+
+    db.log_api_call(
+        endpoint="manual-send-card",
+        member_number=member_number,
+        email=email,
+        event_type="admin",
+        action="card_sent" if (apple_pass_url or google_save_url) else "passes_failed",
+        result="success" if (apple_pass_url or google_save_url) else "error",
+        email_sent=bool(apple_pass_url or google_save_url),
+    )
+
+    return _ok({"message": f"Membership card sent to {email}."})
+
+
+# =========================================================================== #
+# GET /api/call-log  – admin view of recent API calls
+# =========================================================================== #
+
+@app.route(route="call-log", methods=["GET"])
+def get_call_log(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    Return the last N API call log entries as JSON.
+    Requires a function key (?code=...).
+    Query params:
+        limit  – max rows to return (default 50, max 200)
+    """
+    try:
+        limit = min(int(req.params.get("limit", "50")), 200)
+    except ValueError:
+        limit = 50
+
+    rows = db.list_api_calls(limit)
+    return func.HttpResponse(
+        json.dumps({"count": len(rows), "calls": rows}, indent=2),
+        status_code=200,
+        mimetype="application/json",
+    )
 
 
 # =========================================================================== #

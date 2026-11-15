@@ -87,11 +87,31 @@ variable "sendgrid_api_key" {
   sensitive   = true
 }
 
+variable "admin_secret" {
+  description = "Password for the admin send-card page"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
 variable "wild_apricot_webhook_secret" {
   description = "Shared secret appended to the Wild Apricot webhook URL"
   type        = string
   default     = ""
   sensitive   = true
+}
+
+variable "wild_apricot_api_key" {
+  description = "Wild Apricot API key for server-to-server contact lookups"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "wild_apricot_account_id" {
+  description = "Wild Apricot account ID (numeric, visible in webhook payloads)"
+  type        = string
+  default     = "530477"
 }
 
 variable "from_email" {

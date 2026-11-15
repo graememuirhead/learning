@@ -1,0 +1,44 @@
+name: Smoke Test 2 – Reissue passes
+
+on:
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  smoke_test_2:
+    name: Smoke Test 2
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install test dependencies
+        run: pip install -r requirements-test.txt requests
+
+      - name: Azure CLI Login
+        run: |
+          az login --service-principal \
+            --username ${{ secrets.AZURE_CLIENT_ID }} \
+            --password ${{ secrets.AZURE_CLIENT_SECRET }} \
+            --tenant ${{ secrets.AZURE_TENANT_ID }}
+          az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Get dev function key
+        run: |
+          KEY=$(az functionapp keys list \
+            --name ryetri-dev-func \
+            --resource-group ryetri-dev-rg \
+            --query 'functionKeys.default' -o tsv)
+          echo "DEV_FUNCTION_KEY=$KEY" >> $GITHUB_ENV
+
+      - name: Reissue passes via self-service endpoint
+        env:
+          DEV_FUNCTION_URL: https://ryetri-dev-func.azurewebsites.net/api
+          DEV_WEBHOOK_SECRET: ${{ secrets.WILD_APRICOT_WEBHOOK_SECRET }}
+        run: pytest tests/integration/test_smoke_email.py::test_smoke_reissue_pass -v -m smoke -s
