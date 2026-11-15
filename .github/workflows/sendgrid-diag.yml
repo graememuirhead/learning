@@ -1,0 +1,55 @@
+name: SendGrid Diagnostic
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diag:
+    name: Check SendGrid delivery status
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check suppression lists
+        env:
+          SG_KEY: ${{ secrets.SENDGRID_API_KEY }}
+        run: |
+          echo "=== Blocks (IP/domain blocked by recipient server) ==="
+          curl -s --request GET \
+            --url https://api.sendgrid.com/v3/suppression/blocks \
+            --header "Authorization: Bearer $SG_KEY" | python3 -m json.tool || echo "(none)"
+
+          echo ""
+          echo "=== Bounces (hard bounces — address doesn't exist) ==="
+          curl -s --request GET \
+            --url https://api.sendgrid.com/v3/suppression/bounces \
+            --header "Authorization: Bearer $SG_KEY" | python3 -m json.tool || echo "(none)"
+
+          echo ""
+          echo "=== Spam Reports ==="
+          curl -s --request GET \
+            --url https://api.sendgrid.com/v3/suppression/spam_reports \
+            --header "Authorization: Bearer $SG_KEY" | python3 -m json.tool || echo "(none)"
+
+          echo ""
+          echo "=== Invalid Emails ==="
+          curl -s --request GET \
+            --url https://api.sendgrid.com/v3/suppression/invalid_emails \
+            --header "Authorization: Bearer $SG_KEY" | python3 -m json.tool || echo "(none)"
+
+      - name: Check sender authentication status
+        env:
+          SG_KEY: ${{ secrets.SENDGRID_API_KEY }}
+        run: |
+          echo "=== Authenticated Domains ==="
+          curl -s --request GET \
+            --url "https://api.sendgrid.com/v3/whitelabel/domains" \
+            --header "Authorization: Bearer $SG_KEY" | python3 -m json.tool
+
+      - name: Check recent email activity (last 10)
+        env:
+          SG_KEY: ${{ secrets.SENDGRID_API_KEY }}
+        run: |
+          echo "=== Recent messages (ryetriclub.com) ==="
+          curl -s --request GET \
+            --url "https://api.sendgrid.com/v3/messages?limit=10&query=to_email%3Dgraeme%40ryetriclub.com" \
+            --header "Authorization: Bearer $SG_KEY" \
+            --header "Content-Type: application/json" | python3 -m json.tool || echo "(Email Activity API may require upgraded plan)"
