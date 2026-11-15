@@ -80,4 +80,18 @@ def test_smoke_reissue_pass(func_url):
     assert resp.status_code == 200, f"Reissue returned {resp.status_code}: {resp.text[:300]}"
     data = resp.json()
     assert "reissued" in data.get("message", "").lower(), f"Unexpected response: {data}"
-    print("✓ Reissue accepted. Check graeme@ryetriclub.com for the new welcome email.")
+
+    apple_url  = data.get("apple_pass_url")
+    google_url = data.get("google_save_url")
+    email_sent = data.get("email_sent", False)
+
+    assert apple_url or google_url, "No pass URL returned — card was not issued"
+    assert email_sent, "Pass issued but email was not sent"
+
+    print("✓ New card issued successfully.")
+    if apple_url:
+        print(f"  Apple pass : {apple_url}")
+    if google_url:
+        print(f"  Google pass: {google_url}")
+    print(f"  Email sent : {email_sent}")
+    print("  Check graeme@ryetriclub.com for the new welcome email.")

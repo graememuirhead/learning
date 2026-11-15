@@ -792,7 +792,13 @@ def reissue_pass(req: func.HttpRequest) -> func.HttpResponse:
         email_sent=email_sent,
     )
 
-    return _ok({"message": "Your membership card has been reissued. Check your email for the new link."})
+    result_body: dict = {"message": "Your membership card has been reissued. Check your email for the new link."}
+    if apple_pass_url:
+        result_body["apple_pass_url"] = apple_pass_url
+    if google_save_url:
+        result_body["google_save_url"] = google_save_url
+    result_body["email_sent"] = email_sent
+    return _ok(result_body)
 
 
 # =========================================================================== #
