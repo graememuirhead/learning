@@ -38,7 +38,7 @@ jobs:
           conn = os.environ["STORAGE_CONNECTION_STRING"]
           service = TableServiceClient.from_connection_string(conn)
 
-          TEST_NAMES = {"graeme muirhead", "ci test member", "test member"}
+          TEST_NAMES = {"graeme muirhead", "ci test member", "test member", "test2"}
 
           for table_name in ("IssuedPasses", "PassRequests"):
               client = service.get_table_client(table_name)
