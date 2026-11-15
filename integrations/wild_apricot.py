@@ -54,9 +54,15 @@ def get_contact(account_id: str, contact_id: str) -> dict:
     name = f"{first_name} {last_name}".strip()
     email = (data.get("Email") or "").strip().lower()
 
-    # RenewalDue is an ISO datetime string — take just the date part
+    # RenewalDue is an ISO datetime string — take just the date part.
+    # New members sometimes have no RenewalDue set yet; default to Dec 31 of
+    # the current year so the pass always carries a valid expiry date.
+    import datetime
     renewal_due = (data.get("RenewalDue") or "")
-    expiry_date = renewal_due[:10] if renewal_due else ""
+    if renewal_due:
+        expiry_date = renewal_due[:10]
+    else:
+        expiry_date = f"{datetime.date.today().year}-12-31"
 
     # Status.Value is a string like "Active", "Lapsed", "Suspended"
     status_obj = data.get("Status") or {}

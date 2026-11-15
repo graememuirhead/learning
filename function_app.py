@@ -605,17 +605,18 @@ def wild_apricot_webhook(req: func.HttpRequest) -> func.HttpResponse:
         )
         return func.HttpResponse(status_code=200)
 
-    if not all([name, email, member_number]):
+    if not all([name, email, member_number, expiry_date]):
         logger.error(
-            "wild-apricot-webhook: missing fields name=%r email=%r member_number=%r",
-            bool(name), bool(email), bool(member_number),
+            "wild-apricot-webhook: missing fields name=%r email=%r "
+            "member_number=%r expiry=%r",
+            bool(name), bool(email), bool(member_number), bool(expiry_date),
         )
         db.log_api_call(
             endpoint="webhook/wild-apricot",
             event_type=event_type,
             action="rejected",
             result="error",
-            error_message=f"Missing fields: name={bool(name)} email={bool(email)} member={bool(member_number)}",
+            error_message=f"Missing fields: name={bool(name)} email={bool(email)} member={bool(member_number)} expiry={bool(expiry_date)}",
             raw_payload=raw_payload_str,
         )
         return func.HttpResponse("Missing required member fields", status_code=422)
