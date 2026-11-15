@@ -14,10 +14,14 @@ or renews via Wild Apricot, and can be reissued by the member or an admin at any
 - [API Reference](#api-reference)
 - [Wild Apricot Webhook](#wild-apricot-webhook)
 - [Admin Tools](#admin-tools)
+- [Weekly Members Report](#weekly-members-report)
+- [Pass Expiry](#pass-expiry)
 - [Deployment](#deployment)
 - [Environment Variables](#environment-variables)
 - [Local Development](#local-development)
 - [Prerequisites](#prerequisites)
+- [Data Storage](#data-storage)
+- [Security Notes](#security-notes)
 
 ---
 
@@ -25,7 +29,7 @@ or renews via Wild Apricot, and can be reissued by the member or an admin at any
 
 ```
 Wild Apricot
-  └── POST /api/webhook/wild-apricot   ← new member joins / renews
+  └── POST /api/webhook/wild-apricot   ← new member joins / renews (RenewalDateChanged)
 
 Azure Functions (Python 3.11)
   ├── POST /api/create-pass            ← manual pass creation (function key required)
@@ -34,13 +38,15 @@ Azure Functions (Python 3.11)
   ├── POST /api/manual-send-card       ← admin: send card to any member
   ├── GET  /api/call-log               ← admin: recent API activity log
   ├── GET  /api/members                ← admin: CSV export of active members
+  ├── TIMER weekly_members_report      ← Thursdays 1pm EST → board@ryetriclub.com
   └── /api/apple/...                   ← Apple Wallet web-service protocol (internal)
 
 Azure Storage Account
   ├── Blob container "passes"          ← .pkpass files
   ├── Table "PassRequests"             ← audit log of every API call
   ├── Table "IssuedPasses"             ← every card ever created
-  └── Table "DeviceRegistrations"      ← Apple device ↔ pass mapping
+  ├── Table "DeviceRegistrations"      ← Apple device ↔ pass mapping
+  └── Table "ApiCallLog"               ← webhook / reissue / admin event log
 
 Azure Static Website (ryetriprodst.z19.web.core.windows.net)
   ├── /index.html                      ← member self-service reissue page
@@ -52,13 +58,17 @@ Azure Static Website (ryetriprodst.z19.web.core.windows.net)
 ## How It Works
 
 1. A member joins or renews in Wild Apricot.
-2. Wild Apricot POSTs a webhook to `/api/webhook/wild-apricot`.
-3. The API calls the Wild Apricot API to fetch the member's details.
-4. Apple Wallet and Google Wallet passes are created and stored.
-5. A welcome email is sent via SendGrid with "Add to Apple Wallet" and "Add to Google Wallet" buttons.
-6. When the member taps a button, they are taken to `GET /api/pass/{id}` which either:
+2. Wild Apricot POSTs a `RenewalDateChanged` webhook to `/api/webhook/wild-apricot`.
+3. The API calls the Wild Apricot REST API to fetch the member's full contact record.
+4. The member must be **Active** and have a **future renewal date** — otherwise the webhook is silently acknowledged (200) with no pass issued.
+5. Apple Wallet and Google Wallet passes are created and stored.
+6. A welcome email is sent via SendGrid with "Add to Apple Wallet" and "Add to Google Wallet" buttons.
+7. When the member taps a button, they are taken to `GET /api/pass/{id}` which either:
    - Streams the `.pkpass` file (Apple), or
    - Redirects to the Google Wallet save URL (Google).
+
+**Pass updates on renewal:**
+When a member renews, Wild Apricot fires another `RenewalDateChanged` webhook. The API detects the new renewal date, voids the old passes, issues new ones, and sends a fresh welcome email.
 
 ---
 
@@ -170,6 +180,7 @@ The member-facing form at **https://membercardrenewal.ryetriclub.com** calls thi
 
 Admin endpoint to send (or resend) a membership card to any member.
 Protected by `ADMIN_SECRET` passed in the request body.
+Existing passes are always voided and fresh ones issued.
 
 **Request body:**
 
@@ -189,12 +200,7 @@ Protected by `ADMIN_SECRET` passed in the request body.
 | `member_number` | Yes | Club membership number |
 | `email` | Yes | Email address to send the card to |
 | `name` | Only if member not in DB | Full name |
-| `expiry_date` | Only if member not in DB | ISO 8601 date |
-
-If the member already exists in the database, `name` and `expiry_date` are taken from
-the existing record. `expiry_date` can be overridden if provided.
-
-Existing passes are voided and fresh ones issued. A welcome email is sent.
+| `expiry_date` | Only if member not in DB | ISO 8601 date — overrides existing value if provided |
 
 **Response (200 OK):**
 
@@ -225,14 +231,14 @@ Recent API activity. Requires a function key.
   "count": 3,
   "calls": [
     {
-      "endpoint":     "webhook/wild-apricot",
-      "event_type":   "MembershipActivated",
-      "action":       "passes_issued",
-      "result":       "success",
+      "endpoint":      "webhook/wild-apricot",
+      "event_type":    "MembershipRenewed",
+      "action":        "passes_issued",
+      "result":        "success",
       "member_number": "99888561",
-      "email":        "member@example.com",
-      "email_sent":   true,
-      "timestamp":    "2026-11-14T10:23:45Z"
+      "email":         "member@example.com",
+      "email_sent":    true,
+      "timestamp":     "2026-11-14T10:23:45Z"
     }
   ]
 }
@@ -243,6 +249,7 @@ Recent API activity. Requires a function key.
 ### GET `/api/members`
 
 CSV export of all active (non-voided) members. Requires a function key.
+Members whose name contains "test member" (case-insensitive) are excluded.
 
 **Response (200 OK):** `text/csv`
 
@@ -261,41 +268,46 @@ Configure Wild Apricot to POST to:
 https://ryetri-prod-func.azurewebsites.net/api/webhook/wild-apricot?secret=<WILD_APRICOT_WEBHOOK_SECRET>
 ```
 
-The endpoint handles two payload shapes that Wild Apricot sends:
+### Trigger: RenewalDateChanged only
 
-### Shape A — real webhook (StatusChanged)
+The API **only acts on `Action: RenewalDateChanged`** webhooks. All other actions
+(`StatusChanged`, `Added`, `LevelChanged`, etc.) are silently acknowledged and ignored.
 
-Wild Apricot sends this when a member's status changes:
+This covers both new joins and renewals: Wild Apricot always fires `RenewalDateChanged`
+when a renewal date is set or updated, by which time the date is already populated.
+
+### Shape A — real Wild Apricot webhook
+
+Wild Apricot sends this shape in production:
 
 ```json
 {
   "MessageType": "Membership",
   "AccountId":   "530477",
   "Parameters": {
-    "Action":           "StatusChanged",
-    "Contact.Id":       "99888561",
-    "Membership.LevelId": "1828218",
-    "Membership.Status": "20"
+    "Action":               "RenewalDateChanged",
+    "Contact.Id":           "99888561",
+    "Membership.LevelId":   "1828218",
+    "Membership.Status":    "20"
   }
 }
 ```
 
-The API then calls the Wild Apricot REST API to fetch the full contact record.
-A pass is only issued when `Membership.Status` is `"20"` (Active) **and** the contact's
-`RenewalDue` field is set in Wild Apricot. If `RenewalDue` is blank, the webhook
-returns **422**.
+The API calls the Wild Apricot REST API (`GET /v2.2/accounts/530477/contacts/{id}`)
+to fetch the full contact record. A pass is only issued when **all** of the following are true:
 
-**Membership.Status values:**
+1. The member's `MembershipStatus` is **Active** in Wild Apricot.
+2. The member's **Renewal Due** date is set and is **in the future**.
 
-| Value | Meaning |
-|---|---|
-| `"20"` | Active → pass issued |
-| `"1"` | Non-active → ignored |
-| `"0"` | Pending → ignored |
+**Note on RenewalDue:** Wild Apricot stores this field in `FieldValues` for new members,
+not at the top level of the contact JSON. The API checks both locations automatically.
 
-### Shape B — smoke-test / legacy format
+If either condition fails, the webhook returns **200** (silently ignored — no pass issued,
+no error).
 
-Used by the smoke test workflows; includes the full Contact object:
+### Shape B — legacy / smoke-test format
+
+Includes the full Contact object inline; used by smoke test workflows:
 
 ```json
 {
@@ -317,9 +329,9 @@ Used by the smoke test workflows; includes the full Contact object:
 
 | Status | Meaning |
 |---|---|
-| 200 | Processed (or deliberately ignored — wrong action, non-Active status) |
+| 200 | Processed successfully, or deliberately ignored (wrong action / non-Active / past date) |
 | 401 | Bad or missing `?secret=` |
-| 422 | Missing required fields (no Contact.Id, or blank RenewalDue in Wild Apricot) |
+| 422 | Missing required fields (no `Contact.Id`) |
 | 502 | Could not reach Wild Apricot API to fetch contact details |
 
 ### TestWebhook ping
@@ -330,7 +342,7 @@ Wild Apricot sends a test ping when the webhook is first configured:
 { "MessageType": "TestWebhook", "AccountId": "530477" }
 ```
 
-The API returns 200 with `{"status": "ok", "message": "Rye Tri membership API is reachable."}`.
+The API returns `200` with `{"status": "ok", "message": "Rye Tri membership API is reachable."}`.
 
 ---
 
@@ -340,11 +352,9 @@ The API returns 200 with `{"status": "ok", "message": "Rye Tri membership API is
 
 **https://ryetriprodst.z19.web.core.windows.net/admin.html**
 
-A simple web form that calls `POST /api/manual-send-card`. Enter:
-- Member number
-- Email address
-- (Optionally) name and renewal date if the member is not yet in the database
-- Admin secret
+A web form that calls `POST /api/manual-send-card`. Enter the member number, email,
+and admin secret. Optionally override name and renewal date if the member is not yet
+in the database. Always voids any existing passes and issues fresh ones.
 
 ### Member self-service reissue
 
@@ -352,6 +362,41 @@ A simple web form that calls `POST /api/manual-send-card`. Enter:
 
 Members use this page when they get a new phone. They enter their member number
 and email; the existing pass is voided and a new welcome email is sent.
+
+### Cleanup workflow
+
+The **Cleanup Test Passes** GitHub Actions workflow (`cleanup-test-passes.yml`) deletes
+test/junk rows from `IssuedPasses` and `PassRequests` in the prod database. Run it
+manually via workflow dispatch. It removes rows where the name matches any of:
+`Graeme Muirhead`, `CI Test Member`, `Test Member`, `Test2`, or any name containing
+`test member`.
+
+---
+
+## Weekly Members Report
+
+Every **Thursday at 1 pm Eastern time**, the API automatically emails a CSV of all
+active members to **board@ryetriclub.com**.
+
+- **Subject:** `Rye Tri Club — Active Members Report (YYYY-MM-DD)`
+- **Body:** "Please see enclosed of active members with issued membership cards."
+- **Attachment:** CSV file with columns `name, email, member_number, expiry_date`
+
+Test members (name contains "test member") are excluded from the report.
+The schedule uses `America/New_York` and observes daylight saving time automatically.
+
+---
+
+## Pass Expiry
+
+Passes expire at **11:59 pm Eastern time** on the renewal date shown on the card.
+For example, a renewal date of `2028-01-01` means the pass remains valid until
+`2028-01-01T23:59:59` Eastern (i.e. `2028-01-02T04:59:59Z` UTC in winter).
+Daylight saving time is handled automatically — the pass always expires at the end
+of the renewal date in the member's local Eastern timezone.
+
+When a pass expires, it greys out in Apple Wallet and shows as expired in Google Wallet.
+The member can reissue a new pass at any time via **https://membercardrenewal.ryetriclub.com**.
 
 ---
 
@@ -361,7 +406,7 @@ and email; the existing pass is voided and a new welcome email is sent.
 
 ```
 working branch
-  → develop   (dev CI: build + unit + integration + E2E tests)
+  → develop   (dev CI: build + unit + integration tests, deploys to ryetri-dev-func)
   → master    (prod CI: manual dispatch only)
 ```
 
@@ -376,7 +421,7 @@ Prod deploy is triggered manually via GitHub Actions workflow dispatch (not on p
 2. Push to `master`.
 3. Go to **Actions → Deploy Rye Tri Membership API to Azure → Run workflow**.
 4. The workflow deploys to `ryetri-prod-func`, then automatically sends smoke test #1
-   (a real welcome email to graeme@ryetriclub.com).
+   (a real welcome email to graeme@ryetriclub.com via `manual-send-card`).
 5. Confirm the email looks correct.
 6. Run smoke test #2 (reissue) via **Actions → Smoke Test 2 → Run workflow**.
 
@@ -384,8 +429,8 @@ Prod deploy is triggered manually via GitHub Actions workflow dispatch (not on p
 
 | Workflow | What it does |
 |---|---|
-| `smoke-test.yml` (runs automatically in `deploy.yml`) | Issues a TEST99999 pass and sends a welcome email to graeme@ryetriclub.com |
-| `smoke-test-2.yml` (manual dispatch) | Voids and reissues the TEST99999 pass, sends a second email |
+| Smoke test #1 (runs automatically in `deploy.yml`) | Issues a `TEST99999` pass via `manual-send-card` and sends a welcome email to graeme@ryetriclub.com |
+| `smoke-test.yml` (manual dispatch) | Voids and reissues the `TEST99999` pass, sends a second email |
 
 ---
 
@@ -425,7 +470,7 @@ Set these in `local.settings.json` for local development, or as Application Sett
 
 | Variable | Description |
 |---|---|
-| `SENDGRID_API_KEY` | SendGrid API key for sending welcome emails |
+| `SENDGRID_API_KEY` | SendGrid API key for sending welcome emails and weekly member reports |
 | `FROM_EMAIL` | Sender email address (default: `membership@ryetriclub.com`) |
 
 ### Wild Apricot
@@ -532,8 +577,7 @@ openssl x509 -inform der -in AppleWWDRCAG3.cer -out AppleWWDRCAG3.pem
    ```
    https://ryetri-prod-func.azurewebsites.net/api/webhook/wild-apricot?secret=<WILD_APRICOT_WEBHOOK_SECRET>
    ```
-3. Ensure all members have a **Renewal Due** date set — the webhook will return 422
-   and no pass will be issued for members with a blank renewal date.
+3. The API triggers on `RenewalDateChanged` events only. All other actions are ignored.
 
 ### SendGrid
 
@@ -546,13 +590,14 @@ openssl x509 -inform der -in AppleWWDRCAG3.cer -out AppleWWDRCAG3.pem
 
 ## Data Storage
 
-All data is stored in Azure Table Storage.
+All data is stored in Azure Table Storage under partition key `RyeTri`.
 
 | Table | Contents |
 |---|---|
 | `PassRequests` | Every call to `POST /create-pass` (audit log) |
 | `IssuedPasses` | Every pass ever created, including voided ones |
 | `DeviceRegistrations` | Apple device ↔ pass registrations (one-device-per-pass policy) |
+| `ApiCallLog` | Webhook, reissue and admin event log (newest-first by inverted timestamp) |
 
 Blob container `passes` stores the raw `.pkpass` files.
 
