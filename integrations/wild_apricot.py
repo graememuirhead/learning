@@ -54,8 +54,15 @@ def get_contact(account_id: str, contact_id: str) -> dict:
     name = f"{first_name} {last_name}".strip()
     email = (data.get("Email") or "").strip().lower()
 
-    # RenewalDue is an ISO datetime string — take just the date part
+    # RenewalDue can be a top-level field or buried in FieldValues depending on
+    # how Wild Apricot created the contact (new signups use FieldValues).
     renewal_due = (data.get("RenewalDue") or "")
+    if not renewal_due:
+        for fv in data.get("FieldValues", []):
+            if (fv.get("SystemCode") in ("RenewalDue",) or
+                    fv.get("FieldName", "").lower() == "renewal due"):
+                renewal_due = str(fv.get("Value") or "")
+                break
     expiry_date = renewal_due[:10] if renewal_due else ""
 
     # Status.Value is a string like "Active", "Lapsed", "Suspended"
