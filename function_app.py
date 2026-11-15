@@ -499,6 +499,21 @@ def wild_apricot_webhook(req: func.HttpRequest) -> func.HttpResponse:
     message_type = body.get("MessageType", "")
     event_type = body.get("EventType", "")
 
+    if message_type == "TestWebhook":
+        logger.info("wild-apricot-webhook: test ping received from account=%s", body.get("AccountId"))
+        db.log_api_call(
+            endpoint="webhook/wild-apricot",
+            event_type="TestWebhook",
+            action="ping",
+            result="ok",
+            raw_payload=raw_payload_str,
+        )
+        return func.HttpResponse(
+            json.dumps({"status": "ok", "message": "Rye Tri membership API is reachable."}),
+            status_code=200,
+            mimetype="application/json",
+        )
+
     if message_type == "Membership":
         # Shape A — real Wild Apricot webhook
         action_field = params.get("Action", "")
