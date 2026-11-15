@@ -1,0 +1,54 @@
+name: Debug WA Contact
+
+on:
+  workflow_dispatch:
+
+jobs:
+  debug:
+    name: Fetch raw Wild Apricot contact 99886401
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch contact JSON
+        env:
+          WA_API_KEY: ${{ secrets.WILD_APRICOT_API_KEY }}
+        run: |
+          python3 << 'EOF'
+          import os, base64, json, urllib.request, urllib.parse
+
+          api_key = os.environ["WA_API_KEY"]
+          credentials = base64.b64encode(f"APIKEY:{api_key}".encode()).decode()
+
+          # Get token
+          payload = urllib.parse.urlencode({"grant_type": "client_credentials", "scope": "auto"}).encode()
+          req = urllib.request.Request(
+              "https://oauth.wildapricot.org/auth/token",
+              data=payload,
+              headers={
+                  "Authorization": f"Basic {credentials}",
+                  "Content-Type": "application/x-www-form-urlencoded",
+              },
+              method="POST",
+          )
+          with urllib.request.urlopen(req, timeout=15) as resp:
+              token = json.loads(resp.read())["access_token"]
+
+          # Fetch contact
+          req = urllib.request.Request(
+              "https://api.wildapricot.org/v2.2/accounts/530477/contacts/99886401",
+              headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
+          )
+          with urllib.request.urlopen(req, timeout=15) as resp:
+              data = json.loads(resp.read())
+
+          # Print key fields
+          print("=== Key fields ===")
+          for k in ("Id", "FirstName", "LastName", "Email", "Status", "RenewalDue", "MemberSince", "MembershipLevel"):
+              print(f"  {k}: {data.get(k)}")
+
+          print("\n=== FieldValues (custom fields) ===")
+          for fv in data.get("FieldValues", []):
+              print(f"  {fv.get('FieldName')}: {fv.get('Value')}")
+
+          print("\n=== Full JSON ===")
+          print(json.dumps(data, indent=2, default=str))
+          EOF
