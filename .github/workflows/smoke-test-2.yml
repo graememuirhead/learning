@@ -29,16 +29,16 @@ jobs:
             --tenant ${{ secrets.AZURE_TENANT_ID }}
           az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Get dev function key
+      - name: Get prod function key
         run: |
           KEY=$(az functionapp keys list \
-            --name ryetri-dev-func \
-            --resource-group ryetri-dev-rg \
+            --name ryetri-prod-func \
+            --resource-group ryetri-prod-rg \
             --query 'functionKeys.default' -o tsv)
           echo "DEV_FUNCTION_KEY=$KEY" >> $GITHUB_ENV
 
       - name: Reissue passes via self-service endpoint
         env:
-          DEV_FUNCTION_URL: https://ryetri-dev-func.azurewebsites.net/api
+          DEV_FUNCTION_URL: https://ryetri-prod-func.azurewebsites.net/api
           DEV_WEBHOOK_SECRET: ${{ secrets.WILD_APRICOT_WEBHOOK_SECRET }}
         run: pytest tests/integration/test_smoke_email.py::test_smoke_reissue_pass -v -m smoke -s
