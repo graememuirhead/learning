@@ -17,6 +17,7 @@ import json
 import logging
 import time
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 import google.auth.crypt
 import google.auth.jwt
@@ -178,13 +179,15 @@ def _build_generic_object(
     """Build a GenericObject for a single membership card."""
 
     # Google Wallet uses RFC 3339 for dates
+    # Expire at 23:59:59 Eastern time (handles EST/EDT automatically)
+    _eastern = ZoneInfo("America/New_York")
     try:
         exp_dt = datetime.strptime(expiry_date, "%Y-%m-%d").replace(
-            hour=23, minute=59, second=59, tzinfo=timezone.utc
+            hour=23, minute=59, second=59, tzinfo=_eastern
         )
     except ValueError:
         exp_dt = datetime.fromisoformat(expiry_date.replace("Z", "+00:00"))
-    expiration_iso = exp_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    expiration_iso = exp_dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     return {
         "id": object_id,

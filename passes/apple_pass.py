@@ -20,6 +20,7 @@ import subprocess
 import tempfile
 import zipfile
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from typing import Optional
 
 from cryptography import x509
@@ -95,15 +96,16 @@ def _build_pass_json(
     """Build the pass.json content for a generic membership card."""
 
     # Apple requires full RFC 3339 for expirationDate
+    # Expire at 23:59:59 Eastern time (handles EST/EDT automatically)
+    _eastern = ZoneInfo("America/New_York")
     try:
         exp_dt = datetime.strptime(expiry_date, "%Y-%m-%d").replace(
-            hour=23, minute=59, second=59, tzinfo=timezone.utc
+            hour=23, minute=59, second=59, tzinfo=_eastern
         )
     except ValueError:
-        # Already includes time component
         exp_dt = datetime.fromisoformat(expiry_date.replace("Z", "+00:00"))
 
-    expiration_iso = exp_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    expiration_iso = exp_dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     pass_data = {
         "formatVersion": 1,
