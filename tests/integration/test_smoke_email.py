@@ -39,8 +39,8 @@ def test_smoke_welcome_email(func_url, webhook_secret):
         "AccountId": 123456,
         "Parameters": {
             "Contact": {
-                "FirstName": "Graeme",
-                "LastName": "Muirhead",
+                "FirstName": "Test",
+                "LastName": "Member",
                 "Email": "graeme@ryetriclub.com",
                 "Id": member_id,
                 "RenewalDue": "2099-12-31T00:00:00",

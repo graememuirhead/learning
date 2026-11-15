@@ -244,9 +244,12 @@ def list_active_members() -> list[dict]:
     seen: dict[str, dict] = {}
     for e in entities:
         mn = e.get("MemberNumber", "")
+        name = e.get("Name", "")
+        if name.strip().lower() == "test member":
+            continue
         if mn not in seen:
             seen[mn] = {
-                "name": e.get("Name", ""),
+                "name": name,
                 "email": e.get("Email", ""),
                 "member_number": mn,
                 "expiry_date": e.get("ExpiryDate", ""),
