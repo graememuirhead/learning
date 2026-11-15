@@ -23,11 +23,11 @@ jobs:
 
           payloads = [
               # Chronological order per WA webhook log
-              ("5:31 PM — StatusChanged Status 20 (Active) — expect pass + email",
+              ("5:31 PM — StatusChanged Status 20 — IGNORED (only RenewalDateChanged triggers pass)",
                {"AccountId":"530477","MessageType":"Membership","Parameters":{"Action":"StatusChanged","Contact.Id":"99886401","Membership.LevelId":"1828218","Membership.Status":"20"}}),
-              ("5:37 PM — StatusChanged Status 1 — expect no email",
+              ("5:37 PM — StatusChanged Status 1 — IGNORED",
                {"AccountId":"530477","MessageType":"Membership","Parameters":{"Action":"StatusChanged","Contact.Id":"99886401","Membership.LevelId":"1828218","Membership.Status":"1"}}),
-              ("5:37 PM — RenewalDateChanged Status 0 — expect no email",
+              ("5:37 PM — RenewalDateChanged Status 0 — PROCESSED: fetch WA API, check Active + future date",
                {"AccountId":"530477","MessageType":"Membership","Parameters":{"Action":"RenewalDateChanged","Contact.Id":"99886401","Membership.LevelId":"1828218","Membership.Status":"0"}}),
           ]
 
