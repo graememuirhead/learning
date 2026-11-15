@@ -796,6 +796,109 @@ def reissue_pass(req: func.HttpRequest) -> func.HttpResponse:
 
 
 # =========================================================================== #
+# POST /api/admin/send-card  – admin: manually send a membership card
+# =========================================================================== #
+
+@app.route(route="admin/send-card", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+def admin_send_card(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    Admin endpoint: send (or resend) a membership card to any member.
+    Protected by ADMIN_SECRET — the caller must include it in the request body.
+
+    Body (JSON):
+        admin_secret   (required) – must match ADMIN_SECRET setting
+        member_number  (required) – club membership number
+        email          (required) – email address to send the card to
+        name           (optional) – full name; used only if member not in DB
+        expiry_date    (optional) – ISO date; used only if member not in DB
+    """
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _bad_request("Request body must be valid JSON.")
+
+    # Verify admin secret
+    provided = (body.get("admin_secret") or "").strip()
+    expected = Settings.ADMIN_SECRET.strip()
+    if not expected or not secrets.compare_digest(provided, expected):
+        logger.warning("admin/send-card: rejected unauthorised request")
+        return func.HttpResponse(
+            json.dumps({"error": "Unauthorised."}),
+            status_code=401,
+            mimetype="application/json",
+        )
+
+    member_number = _str(body, "member_number")
+    email = _str(body, "email").lower()
+    override_name = _str(body, "name")
+    override_expiry = _str(body, "expiry_date")
+
+    if not member_number or not email:
+        return _bad_request("'member_number' and 'email' are required.")
+
+    # Try to find existing passes
+    apple_pass = db.get_pass_by_member_number(member_number, "apple")
+    google_pass = db.get_pass_by_member_number(member_number, "google")
+    existing = apple_pass or google_pass
+
+    if existing:
+        name = existing.get("Name", override_name)
+        expiry_date = existing.get("ExpiryDate", override_expiry)
+    elif override_name and override_expiry:
+        name = override_name
+        expiry_date = override_expiry
+    else:
+        logger.warning("admin/send-card: member=%s not in DB and no name/expiry provided", member_number)
+        return func.HttpResponse(
+            json.dumps({"error": "Member not found. Provide 'name' and 'expiry_date' to create from scratch."}),
+            status_code=404,
+            mimetype="application/json",
+        )
+
+    if override_expiry and override_expiry != expiry_date:
+        expiry_date = override_expiry
+
+    request_id = str(uuid.uuid4())
+    logger.info("admin/send-card member=%s email=%s expiry=%s", member_number, email, expiry_date)
+
+    # Void existing passes and issue fresh ones
+    for wallet_type, pass_record in [("apple", apple_pass), ("google", google_pass)]:
+        if pass_record:
+            _expire_old_pass(pass_record["RowKey"], wallet_type)
+
+    apple_pass_url: Optional[str] = None
+    google_save_url: Optional[str] = None
+
+    for wallet_type in ("apple", "google"):
+        try:
+            url = _issue_new_pass(request_id, wallet_type, name, email, member_number, expiry_date)
+            if wallet_type == "apple":
+                apple_pass_url = url
+            else:
+                google_save_url = url
+        except Exception:
+            logger.exception("admin/send-card: %s pass failed for member=%s", wallet_type, member_number)
+
+    if apple_pass_url or google_save_url:
+        try:
+            send_welcome_email(name, email, member_number, expiry_date, apple_pass_url, google_save_url)
+        except Exception:
+            logger.exception("admin/send-card: email failed for member=%s", member_number)
+
+    db.log_api_call(
+        endpoint="admin/send-card",
+        member_number=member_number,
+        email=email,
+        event_type="admin",
+        action="card_sent" if (apple_pass_url or google_save_url) else "passes_failed",
+        result="success" if (apple_pass_url or google_save_url) else "error",
+        email_sent=bool(apple_pass_url or google_save_url),
+    )
+
+    return _ok({"message": f"Membership card sent to {email}."})
+
+
+# =========================================================================== #
 # GET /api/call-log  – admin view of recent API calls
 # =========================================================================== #
 

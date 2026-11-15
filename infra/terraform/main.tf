@@ -147,6 +147,7 @@ resource "azurerm_linux_function_app" "main" {
     # Notifications
     SENDGRID_API_KEY            = var.sendgrid_api_key
     FROM_EMAIL                  = var.from_email
+    ADMIN_SECRET                = var.admin_secret
     WILD_APRICOT_WEBHOOK_SECRET = var.wild_apricot_webhook_secret
     WILD_APRICOT_API_KEY        = var.wild_apricot_api_key
     WILD_APRICOT_ACCOUNT_ID     = var.wild_apricot_account_id
