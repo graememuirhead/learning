@@ -82,7 +82,7 @@ def test_webhook_unknown_event_type_is_ignored(func_url, webhook_secret):
 
 
 def test_shape_a_missing_contact_id_rejected(func_url, webhook_secret):
-    """Shape A with no Contact.Id should be rejected with 422."""
+    """Shape A RenewalDateChanged with no Contact.Id should be rejected with 422."""
     if not webhook_secret:
         import pytest
         pytest.skip("DEV_WEBHOOK_SECRET not set")
@@ -93,7 +93,7 @@ def test_shape_a_missing_contact_id_rejected(func_url, webhook_secret):
             "MessageType": "Membership",
             "AccountId": "530477",
             "Parameters": {
-                "Action": "StatusChanged",
+                "Action": "RenewalDateChanged",
                 "Membership.Status": "20",
                 # Contact.Id intentionally absent
             },
@@ -103,31 +103,32 @@ def test_shape_a_missing_contact_id_rejected(func_url, webhook_secret):
     assert resp.status_code == 422
 
 
-def test_shape_a_non_status_changed_action_ignored(func_url, webhook_secret):
-    """Shape A with Action != StatusChanged should be silently ignored (200)."""
+def test_shape_a_non_renewal_date_action_ignored(func_url, webhook_secret):
+    """Shape A with Action != RenewalDateChanged should be silently ignored (200)."""
     if not webhook_secret:
         import pytest
         pytest.skip("DEV_WEBHOOK_SECRET not set")
-    resp = requests.post(
-        f"{func_url}/webhook/wild-apricot",
-        params={"secret": webhook_secret},
-        json={
-            "MessageType": "Membership",
-            "AccountId": "530477",
-            "Parameters": {
-                "Action": "Added",  # not StatusChanged — should be ignored
-                "Contact.Id": "99999999",
-                "Membership.Status": "20",
+    for action in ("StatusChanged", "Added", "LevelChanged"):
+        resp = requests.post(
+            f"{func_url}/webhook/wild-apricot",
+            params={"secret": webhook_secret},
+            json={
+                "MessageType": "Membership",
+                "AccountId": "530477",
+                "Parameters": {
+                    "Action": action,
+                    "Contact.Id": "99999999",
+                    "Membership.Status": "20",
+                },
             },
-        },
-        timeout=30,
-    )
-    assert resp.status_code == 200
+            timeout=30,
+        )
+        assert resp.status_code == 200, f"Expected 200 for Action={action}, got {resp.status_code}"
 
 
 def test_shape_a_calls_wild_apricot_api(func_url, webhook_secret):
     """
-    Shape A with an unknown contact ID exercises the full WA API call path.
+    Shape A RenewalDateChanged with an unknown contact ID exercises the full WA API call path.
     Wild Apricot returns 404 for the bogus ID, which the function maps to 502.
     A 502 (not 422/400) confirms wa_get_contact() was called rather than bypassed.
     """
@@ -141,7 +142,7 @@ def test_shape_a_calls_wild_apricot_api(func_url, webhook_secret):
             "MessageType": "Membership",
             "AccountId": "530477",
             "Parameters": {
-                "Action": "StatusChanged",
+                "Action": "RenewalDateChanged",
                 "Contact.Id": "9999999",  # valid format, non-existent contact
                 "Membership.Status": "20",
             },

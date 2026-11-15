@@ -517,7 +517,7 @@ def wild_apricot_webhook(req: func.HttpRequest) -> func.HttpResponse:
     if message_type == "Membership":
         # Shape A — real Wild Apricot webhook
         action_field = params.get("Action", "")
-        if action_field != "StatusChanged":
+        if action_field != "RenewalDateChanged":
             logger.info("wild-apricot-webhook ignoring action=%s", action_field)
             db.log_api_call(
                 endpoint="webhook/wild-apricot",
@@ -535,7 +535,7 @@ def wild_apricot_webhook(req: func.HttpRequest) -> func.HttpResponse:
             logger.error("wild-apricot-webhook: no Contact.Id in payload")
             db.log_api_call(
                 endpoint="webhook/wild-apricot",
-                event_type="Membership/StatusChanged",
+                event_type=f"Membership/{action_field}",
                 action="rejected",
                 result="error",
                 error_message="No Contact.Id in payload",
@@ -551,7 +551,7 @@ def wild_apricot_webhook(req: func.HttpRequest) -> func.HttpResponse:
             db.log_api_call(
                 endpoint="webhook/wild-apricot",
                 member_number=contact_id,
-                event_type="Membership/StatusChanged",
+                event_type=f"Membership/{action_field}",
                 action="rejected",
                 result="error",
                 error_message=f"WA API error: {exc}",
@@ -569,7 +569,7 @@ def wild_apricot_webhook(req: func.HttpRequest) -> func.HttpResponse:
                 endpoint="webhook/wild-apricot",
                 member_number=contact_id,
                 email=contact_data["email"],
-                event_type="Membership/StatusChanged",
+                event_type=f"Membership/{action_field}",
                 action="ignored",
                 result="ok",
                 error_message=f"Status is {contact_data['status']}, not Active",
@@ -581,7 +581,42 @@ def wild_apricot_webhook(req: func.HttpRequest) -> func.HttpResponse:
         email = contact_data["email"]
         member_number = contact_id
         expiry_date = contact_data["expiry_date"]
-        event_type = "MembershipActivated"  # normalise for the rest of the handler
+
+        # Blank renewal date — do nothing
+        if not expiry_date:
+            logger.info("wild-apricot-webhook: contact=%s renewal date blank — ignoring", contact_id)
+            db.log_api_call(
+                endpoint="webhook/wild-apricot",
+                member_number=contact_id,
+                email=email,
+                event_type=f"Membership/{action_field}",
+                action="ignored",
+                result="ok",
+                error_message="Blank renewal date",
+                raw_payload=raw_payload_str,
+            )
+            return func.HttpResponse(status_code=200)
+
+        # Renewal date in the past — do nothing
+        today = datetime.utcnow().strftime("%Y-%m-%d")
+        if expiry_date < today:
+            logger.info(
+                "wild-apricot-webhook: contact=%s renewal date %s is in the past — ignoring",
+                contact_id, expiry_date,
+            )
+            db.log_api_call(
+                endpoint="webhook/wild-apricot",
+                member_number=contact_id,
+                email=email,
+                event_type=f"Membership/{action_field}",
+                action="ignored",
+                result="ok",
+                error_message=f"Renewal date {expiry_date} is in the past",
+                raw_payload=raw_payload_str,
+            )
+            return func.HttpResponse(status_code=200)
+
+        event_type = "MembershipRenewed"
 
     elif event_type in ("MembershipActivated", "MembershipRenewed"):
         # Shape B — smoke-test / legacy format with full contact in payload
@@ -629,6 +664,7 @@ def wild_apricot_webhook(req: func.HttpRequest) -> func.HttpResponse:
     request_id = str(uuid.uuid4())
     apple_pass_url: Optional[str] = None
     google_save_url: Optional[str] = None
+    pass_updated = False
 
     for wallet_type in ("apple", "google"):
         try:
@@ -637,18 +673,21 @@ def wild_apricot_webhook(req: func.HttpRequest) -> func.HttpResponse:
                 expiry_changed = expiry_date != existing.get("ExpiryDate", "")
                 email_changed = email != existing.get("Email", "")
                 if not expiry_changed and not email_changed:
-                    # Nothing changed — reuse the existing pass URL
+                    # Nothing changed — reuse the existing pass URL, no email
                     url = existing["PassUrl"]
                     logger.info("wild-apricot-webhook %s pass unchanged pass_id=%s", wallet_type, existing["RowKey"])
                 elif not expiry_changed and email_changed:
                     db.update_pass_email(existing["RowKey"], email)
                     url = existing["PassUrl"]
+                    pass_updated = True
                     logger.info("wild-apricot-webhook %s pass email updated pass_id=%s", wallet_type, existing["RowKey"])
                 else:
                     _expire_old_pass(existing["RowKey"], wallet_type)
                     url = _issue_new_pass(request_id, wallet_type, name, email, member_number, expiry_date)
+                    pass_updated = True
             else:
                 url = _issue_new_pass(request_id, wallet_type, name, email, member_number, expiry_date)
+                pass_updated = True
 
             if wallet_type == "apple":
                 apple_pass_url = url
@@ -662,7 +701,7 @@ def wild_apricot_webhook(req: func.HttpRequest) -> func.HttpResponse:
             )
 
     email_sent = False
-    if apple_pass_url or google_save_url:
+    if pass_updated and (apple_pass_url or google_save_url):
         try:
             send_welcome_email(name, email, member_number, expiry_date, apple_pass_url, google_save_url)
             email_sent = True
