@@ -799,7 +799,7 @@ def reissue_pass(req: func.HttpRequest) -> func.HttpResponse:
 # POST /api/admin/send-card  – admin: manually send a membership card
 # =========================================================================== #
 
-@app.route(route="admin-send-card", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+@app.route(route="manual-send-card", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def admin_send_card(req: func.HttpRequest) -> func.HttpResponse:
     """
     Admin endpoint: send (or resend) a membership card to any member.
@@ -886,7 +886,7 @@ def admin_send_card(req: func.HttpRequest) -> func.HttpResponse:
             logger.exception("admin/send-card: email failed for member=%s", member_number)
 
     db.log_api_call(
-        endpoint="admin-send-card",
+        endpoint="manual-send-card",
         member_number=member_number,
         email=email,
         event_type="admin",
