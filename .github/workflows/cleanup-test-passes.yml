@@ -1,0 +1,65 @@
+name: Cleanup Test Passes
+
+on:
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    name: Delete passes named "Graeme Muirhead" from prod
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Get storage connection string
+        run: |
+          CONN=$(az storage account show-connection-string \
+            --name ryetriprodst \
+            --resource-group ryetri-prod-rg \
+            --query connectionString -o tsv)
+          echo "STORAGE_CONNECTION_STRING=$CONN" >> $GITHUB_ENV
+
+      - name: Delete test passes
+        env:
+          STORAGE_CONNECTION_STRING: ${{ env.STORAGE_CONNECTION_STRING }}
+        run: |
+          pip install azure-data-tables -q
+          python3 << 'EOF'
+          import os
+          from azure.data.tables import TableServiceClient
+
+          conn = os.environ["STORAGE_CONNECTION_STRING"]
+          service = TableServiceClient.from_connection_string(conn)
+
+          for table_name in ("IssuedPasses", "PassRequests"):
+              client = service.get_table_client(table_name)
+              try:
+                  entities = list(client.query_entities(
+                      "PartitionKey eq 'pass'",
+                      select=["PartitionKey", "RowKey", "Name", "MemberNumber"],
+                  ))
+              except Exception:
+                  # PassRequests uses a different schema — scan all
+                  entities = list(client.list_entities(
+                      select=["PartitionKey", "RowKey", "Name", "MemberNumber"],
+                  ))
+
+              deleted = 0
+              for e in entities:
+                  name = (e.get("Name") or "").strip()
+                  if name.lower() == "graeme muirhead":
+                      client.delete_entity(
+                          partition_key=e["PartitionKey"],
+                          row_key=e["RowKey"],
+                      )
+                      deleted += 1
+                      print(f"  [{table_name}] deleted {e['RowKey']} member={e.get('MemberNumber')}")
+
+              print(f"{table_name}: deleted {deleted} rows")
+
+          print("Done.")
+          EOF
