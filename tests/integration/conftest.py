@@ -35,6 +35,11 @@ def webhook_secret() -> str:
 
 
 @pytest.fixture(scope="session")
+def admin_secret() -> str:
+    return os.environ.get("DEV_ADMIN_SECRET", "").strip()
+
+
+@pytest.fixture(scope="session")
 def storage_connection_string() -> str:
     return os.environ.get("DEV_STORAGE_CONNECTION_STRING", "")
 
