@@ -1,0 +1,39 @@
+name: Replay Webhook
+
+on:
+  workflow_dispatch:
+
+jobs:
+  replay:
+    name: Replay webhook for contact 99886401
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send StatusChanged (Status 1) — expect no email
+        env:
+          SECRET: ${{ secrets.WILD_APRICOT_WEBHOOK_SECRET }}
+        run: |
+          echo "=== StatusChanged Status 1 ==="
+          curl -s -w "\nHTTP %{http_code}" -X POST \
+            "https://ryetri-prod-func.azurewebsites.net/api/webhook/wild-apricot?secret=${SECRET}" \
+            -H "Content-Type: application/json" \
+            -d '{"AccountId":"530477","MessageType":"Membership","Parameters":{"Action":"StatusChanged","Contact.Id":"99886401","Membership.LevelId":"1828218","Membership.Status":"1"}}'
+
+      - name: Send RenewalDateChanged — expect no email
+        env:
+          SECRET: ${{ secrets.WILD_APRICOT_WEBHOOK_SECRET }}
+        run: |
+          echo "=== RenewalDateChanged ==="
+          curl -s -w "\nHTTP %{http_code}" -X POST \
+            "https://ryetri-prod-func.azurewebsites.net/api/webhook/wild-apricot?secret=${SECRET}" \
+            -H "Content-Type: application/json" \
+            -d '{"AccountId":"530477","MessageType":"Membership","Parameters":{"Action":"RenewalDateChanged","Contact.Id":"99886401","Membership.LevelId":"1828218","Membership.Status":"0"}}'
+
+      - name: Send StatusChanged (Status 20) — expect email
+        env:
+          SECRET: ${{ secrets.WILD_APRICOT_WEBHOOK_SECRET }}
+        run: |
+          echo "=== StatusChanged Status 20 (Active) — should trigger pass + email ==="
+          curl -s -w "\nHTTP %{http_code}" -X POST \
+            "https://ryetri-prod-func.azurewebsites.net/api/webhook/wild-apricot?secret=${SECRET}" \
+            -H "Content-Type: application/json" \
+            -d '{"AccountId":"530477","MessageType":"Membership","Parameters":{"Action":"StatusChanged","Contact.Id":"99886401","Membership.LevelId":"1828218","Membership.Status":"20"}}'
