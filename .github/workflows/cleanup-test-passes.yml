@@ -35,29 +35,30 @@ jobs:
           conn = os.environ["STORAGE_CONNECTION_STRING"]
           service = TableServiceClient.from_connection_string(conn)
 
+          TEST_NAMES = {"graeme muirhead", "ci test member", "test member"}
+
           for table_name in ("IssuedPasses", "PassRequests"):
               client = service.get_table_client(table_name)
               try:
                   entities = list(client.query_entities(
-                      "PartitionKey eq 'pass'",
+                      "PartitionKey eq 'RyeTri'",
                       select=["PartitionKey", "RowKey", "Name", "MemberNumber"],
                   ))
               except Exception:
-                  # PassRequests uses a different schema — scan all
                   entities = list(client.list_entities(
                       select=["PartitionKey", "RowKey", "Name", "MemberNumber"],
                   ))
 
               deleted = 0
               for e in entities:
-                  name = (e.get("Name") or "").strip()
-                  if name.lower() == "graeme muirhead":
+                  name = (e.get("Name") or "").strip().lower()
+                  if name in TEST_NAMES or "test member" in name:
                       client.delete_entity(
                           partition_key=e["PartitionKey"],
                           row_key=e["RowKey"],
                       )
                       deleted += 1
-                      print(f"  [{table_name}] deleted {e['RowKey']} member={e.get('MemberNumber')}")
+                      print(f"  [{table_name}] deleted {e['RowKey']} name={e.get('Name')} member={e.get('MemberNumber')}")
 
               print(f"{table_name}: deleted {deleted} rows")
 

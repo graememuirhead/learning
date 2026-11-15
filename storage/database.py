@@ -245,7 +245,7 @@ def list_active_members() -> list[dict]:
     for e in entities:
         mn = e.get("MemberNumber", "")
         name = e.get("Name", "")
-        if name.strip().lower() == "test member":
+        if "test member" in name.strip().lower():
             continue
         if mn not in seen:
             seen[mn] = {
