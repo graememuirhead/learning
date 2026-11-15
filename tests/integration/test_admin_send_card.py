@@ -19,7 +19,7 @@ NEW_MEMBER = {
 
 def test_no_password_returns_401(func_url):
     resp = requests.post(
-        f"{func_url}/admin/send-card",
+        f"{func_url}/admin-send-card",
         json={"member_number": TEST_MEMBER["member_number"], "email": TEST_MEMBER["email"]},
         timeout=30,
     )
@@ -28,7 +28,7 @@ def test_no_password_returns_401(func_url):
 
 def test_wrong_password_returns_401(func_url):
     resp = requests.post(
-        f"{func_url}/admin/send-card",
+        f"{func_url}/admin-send-card",
         json={
             "admin_secret": "this-is-definitely-wrong",
             "member_number": TEST_MEMBER["member_number"],
@@ -41,7 +41,7 @@ def test_wrong_password_returns_401(func_url):
 
 def test_requires_json_body(func_url):
     resp = requests.post(
-        f"{func_url}/admin/send-card",
+        f"{func_url}/admin-send-card",
         data="not json",
         headers={"Content-Type": "application/json"},
         timeout=30,
@@ -57,7 +57,7 @@ def test_missing_member_number_returns_400_or_401(func_url):
     """Missing required field — 400 if secret is correct, but 401 is also acceptable
     (the endpoint checks secret before fields; either way it must not return 200)."""
     resp = requests.post(
-        f"{func_url}/admin/send-card",
+        f"{func_url}/admin-send-card",
         json={"admin_secret": "wrong", "email": TEST_MEMBER["email"]},
         timeout=30,
     )
@@ -66,7 +66,7 @@ def test_missing_member_number_returns_400_or_401(func_url):
 
 def test_missing_email_returns_400_or_401(func_url):
     resp = requests.post(
-        f"{func_url}/admin/send-card",
+        f"{func_url}/admin-send-card",
         json={"admin_secret": "wrong", "member_number": TEST_MEMBER["member_number"]},
         timeout=30,
     )
@@ -83,7 +83,7 @@ def test_existing_member_returns_200(func_url, admin_secret):
         pytest.skip("DEV_ADMIN_SECRET not set")
 
     resp = requests.post(
-        f"{func_url}/admin/send-card",
+        f"{func_url}/admin-send-card",
         json={
             "admin_secret": admin_secret,
             "member_number": TEST_MEMBER["member_number"],
@@ -103,7 +103,7 @@ def test_nonexistent_member_without_override_returns_404(func_url, admin_secret)
         pytest.skip("DEV_ADMIN_SECRET not set")
 
     resp = requests.post(
-        f"{func_url}/admin/send-card",
+        f"{func_url}/admin-send-card",
         json={
             "admin_secret": admin_secret,
             "member_number": "DOESNOTEXIST99",
@@ -128,7 +128,7 @@ def test_nonexistent_member_with_override_creates_and_returns_200(func_url, admi
     )
 
     resp = requests.post(
-        f"{func_url}/admin/send-card",
+        f"{func_url}/admin-send-card",
         json={
             "admin_secret": admin_secret,
             "member_number": NEW_MEMBER["member_number"],
@@ -149,7 +149,7 @@ def test_expiry_override_is_used(func_url, admin_secret):
         pytest.skip("DEV_ADMIN_SECRET not set")
 
     resp = requests.post(
-        f"{func_url}/admin/send-card",
+        f"{func_url}/admin-send-card",
         json={
             "admin_secret": admin_secret,
             "member_number": TEST_MEMBER["member_number"],
