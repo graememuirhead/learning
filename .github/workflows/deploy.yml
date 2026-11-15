@@ -264,3 +264,49 @@ jobs:
 
           echo "Reissue page: ${{ needs.infrastructure.outputs.static_website_url }}"
           echo "Admin page:   ${{ needs.infrastructure.outputs.static_website_url }}/admin.html"
+
+  # --------------------------------------------------------------------------
+  # Smoke test #1 — runs automatically after every prod deploy
+  # Sends a real welcome email to graeme@ryetriclub.com.
+  # Smoke test #2 (reissue) is triggered manually via smoke-test.yml.
+  # --------------------------------------------------------------------------
+  smoke_test:
+    name: Smoke Test #1
+    runs-on: ubuntu-latest
+    needs: [deploy, deploy_static]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: pip install -r requirements-test.txt requests
+
+      - name: Azure CLI Login
+        run: |
+          az login --service-principal \
+            --username ${{ secrets.AZURE_CLIENT_ID }} \
+            --password ${{ secrets.AZURE_CLIENT_SECRET }} \
+            --tenant ${{ secrets.AZURE_TENANT_ID }}
+          az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Get prod function key
+        run: |
+          FUNC_APP="ryetri-prod-func"
+          RG="ryetri-prod-rg"
+          echo "DEV_FUNCTION_URL=https://${FUNC_APP}.azurewebsites.net/api" >> $GITHUB_ENV
+          KEY=$(az functionapp keys list \
+            --name "$FUNC_APP" \
+            --resource-group "$RG" \
+            --query 'functionKeys.default' -o tsv)
+          echo "DEV_FUNCTION_KEY=$KEY" >> $GITHUB_ENV
+
+      - name: Run smoke test #1
+        env:
+          DEV_WEBHOOK_SECRET: ${{ secrets.WILD_APRICOT_WEBHOOK_SECRET }}
+        run: |
+          pytest tests/integration/test_smoke_email.py::test_smoke_welcome_email \
+            -v -m smoke -s

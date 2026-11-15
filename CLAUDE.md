@@ -1,16 +1,27 @@
 # Rye Tri Membership API — Claude Code Guidelines
 
-## Branch workflow
+## Deployment process
 
-Always follow this order. Never skip a step.
-
-1. **Develop on the working branch** (`claude/rye-tri-membership-api-TzGR0` or the current session branch).
-2. **Push to `develop` first** — this triggers the dev CI, which deploys to the DEV function app and runs the full integration test suite against it.
-3. **Only push to `master` after dev CI passes** — the production CI runs integration tests against DEV as a health gate before deploying to prod. If DEV is behind, that gate fails.
+Always follow these steps in order. Never skip one.
 
 ```
-working branch → develop → (dev CI passes) → master → (prod CI passes) → deployed to prod
+working branch
+  → develop   (dev CI: build + unit tests + integration tests + E2E tests)
+  → master    (prod CI: build + integration tests against DEV + deploy + smoke test #1)
+  → user confirms smoke test #1 email looks correct
+  → run smoke test #2 (reissue) on request
+  → production confirmed ✓
 ```
+
+### Step by step
+
+1. **Make changes on the working branch** (`claude/rye-tri-membership-api-TzGR0` or the current session branch).
+2. **Push to `develop`** — triggers dev CI: deploys to DEV, runs unit + integration + E2E tests.
+3. **Wait for dev CI to pass.**
+4. **Push to `master`** — triggers prod CI: runs integration tests against DEV as a health gate, then deploys to prod, then runs **smoke test #1** automatically (sends a real welcome email to graeme@ryetriclub.com).
+5. **User checks their email** — confirms the Apple + Google Wallet pass links arrived correctly.
+6. **Run smoke test #2** when asked — voids and reissues the smoke passes, sends a second email. Triggered via the `smoke-test.yml` workflow dispatch.
+7. **Production confirmed.**
 
 Pushing directly to `master` without updating `develop` first will cause the prod CI to fail because DEV will be running stale code.
 
