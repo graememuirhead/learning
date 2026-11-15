@@ -102,7 +102,8 @@ class Settings:
 
     # ---- Wild Apricot ----
     WILD_APRICOT_WEBHOOK_SECRET: str = os.environ.get("WILD_APRICOT_WEBHOOK_SECRET", "")
-    WILD_APRICOT_API_KEY: str = os.environ.get("WILD_APRICOT_API_KEY", "")
+    WILD_APRICOT_CLIENT_ID: str = os.environ.get("WILD_APRICOT_CLIENT_ID", "")
+    WILD_APRICOT_CLIENT_SECRET: str = os.environ.get("WILD_APRICOT_CLIENT_SECRET", "")
     WILD_APRICOT_ACCOUNT_ID: str = os.environ.get("WILD_APRICOT_ACCOUNT_ID", "530477")
 
     # ---- Logo ----

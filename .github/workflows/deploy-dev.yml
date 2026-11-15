@@ -84,7 +84,8 @@ jobs:
           TF_VAR_google_service_account_json:  ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           TF_VAR_sendgrid_api_key:             ${{ secrets.SENDGRID_API_KEY }}
           TF_VAR_wild_apricot_webhook_secret:  ${{ secrets.WILD_APRICOT_WEBHOOK_SECRET }}
-          TF_VAR_wild_apricot_api_key:         ${{ secrets.WILD_APRICOT_API_KEY }}
+          TF_VAR_wild_apricot_client_id:       ${{ secrets.WILD_APRICOT_CLIENT_ID }}
+          TF_VAR_wild_apricot_client_secret:   ${{ secrets.WILD_APRICOT_CLIENT_SECRET }}
           TF_VAR_wild_apricot_account_id:      "530477"
         run: terraform plan -out=tfplan
 
@@ -108,7 +109,8 @@ jobs:
           TF_VAR_google_service_account_json:  ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           TF_VAR_sendgrid_api_key:             ${{ secrets.SENDGRID_API_KEY }}
           TF_VAR_wild_apricot_webhook_secret:  ${{ secrets.WILD_APRICOT_WEBHOOK_SECRET }}
-          TF_VAR_wild_apricot_api_key:         ${{ secrets.WILD_APRICOT_API_KEY }}
+          TF_VAR_wild_apricot_client_id:       ${{ secrets.WILD_APRICOT_CLIENT_ID }}
+          TF_VAR_wild_apricot_client_secret:   ${{ secrets.WILD_APRICOT_CLIENT_SECRET }}
           TF_VAR_wild_apricot_account_id:      "530477"
         run: terraform apply -auto-approve tfplan
 

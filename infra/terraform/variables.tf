@@ -94,8 +94,15 @@ variable "wild_apricot_webhook_secret" {
   sensitive   = true
 }
 
-variable "wild_apricot_api_key" {
-  description = "Wild Apricot API key for fetching contact details"
+variable "wild_apricot_client_id" {
+  description = "Wild Apricot OAuth2 client ID"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "wild_apricot_client_secret" {
+  description = "Wild Apricot OAuth2 client secret"
   type        = string
   default     = ""
   sensitive   = true

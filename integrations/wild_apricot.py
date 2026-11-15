@@ -85,12 +85,12 @@ def _get_token() -> str:
     if _cached_token.get("expires_at", 0) > time.time() + 60:
         return _cached_token["access_token"]
 
-    api_key = Settings.WILD_APRICOT_API_KEY
-    if not api_key:
-        raise RuntimeError("WILD_APRICOT_API_KEY is not configured")
+    client_id = Settings.WILD_APRICOT_CLIENT_ID
+    client_secret = Settings.WILD_APRICOT_CLIENT_SECRET
+    if not client_id or not client_secret:
+        raise RuntimeError("WILD_APRICOT_CLIENT_ID / WILD_APRICOT_CLIENT_SECRET are not configured")
 
-    # Wild Apricot uses the API key as both username and password
-    credentials = base64.b64encode(f"APIKEY:{api_key}".encode()).decode()
+    credentials = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
     payload = urllib.parse.urlencode({"grant_type": "client_credentials", "scope": "auto"}).encode()
 
     req = urllib.request.Request(
