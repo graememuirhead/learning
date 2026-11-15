@@ -48,8 +48,14 @@ jobs:
         env:
           SG_KEY: ${{ secrets.SENDGRID_API_KEY }}
         run: |
-          echo "=== Recent messages (ryetriclub.com) ==="
+          echo "=== Recent messages to graeme@ryetriclub.com ==="
+          # SendGrid query syntax: to_email="addr" — @ must be encoded as %40, quotes as %22
           curl -s --request GET \
-            --url "https://api.sendgrid.com/v3/messages?limit=10&query=to_email%3Dgraeme%40ryetriclub.com" \
+            --url 'https://api.sendgrid.com/v3/messages?limit=10&query=to_email%3D%22graeme%40ryetriclub.com%22' \
             --header "Authorization: Bearer $SG_KEY" \
             --header "Content-Type: application/json" | python3 -m json.tool || echo "(Email Activity API may require upgraded plan)"
+
+      - name: Check MX records for ryetriclub.com
+        run: |
+          echo "=== MX records (where does ryetriclub.com email go?) ==="
+          dig MX ryetriclub.com +short || host -t MX ryetriclub.com
