@@ -268,46 +268,29 @@ Configure Wild Apricot to POST to:
 https://ryetri-prod-func.azurewebsites.net/api/webhook/wild-apricot?secret=<WILD_APRICOT_WEBHOOK_SECRET>
 ```
 
-### Trigger: RenewalDateChanged only
+### Payload shapes
 
-The API **only acts on `Action: RenewalDateChanged`** webhooks. All other actions
-(`StatusChanged`, `Added`, `LevelChanged`, etc.) are silently acknowledged and ignored.
+Wild Apricot sends two different payload shapes.
 
-This covers both new joins and renewals: Wild Apricot always fires `RenewalDateChanged`
-when a renewal date is set or updated, by which time the date is already populated.
-
-### Shape A — real Wild Apricot webhook
-
-Wild Apricot sends this shape in production:
+**Shape A — real webhook (what Wild Apricot sends in production):**
 
 ```json
 {
   "MessageType": "Membership",
   "AccountId":   "530477",
   "Parameters": {
-    "Action":               "RenewalDateChanged",
-    "Contact.Id":           "99888561",
-    "Membership.LevelId":   "1828218",
-    "Membership.Status":    "20"
+    "Action":             "RenewalDateChanged",
+    "Contact.Id":         "99888561",
+    "Membership.LevelId": "1828218",
+    "Membership.Status":  "20"
   }
 }
 ```
 
-The API calls the Wild Apricot REST API (`GET /v2.2/accounts/530477/contacts/{id}`)
-to fetch the full contact record. A pass is only issued when **all** of the following are true:
+Shape A contains only a `Contact.Id`. The API must call back to the Wild Apricot REST API
+to fetch the member's full details.
 
-1. The member's `MembershipStatus` is **Active** in Wild Apricot.
-2. The member's **Renewal Due** date is set and is **in the future**.
-
-**Note on RenewalDue:** Wild Apricot stores this field in `FieldValues` for new members,
-not at the top level of the contact JSON. The API checks both locations automatically.
-
-If either condition fails, the webhook returns **200** (silently ignored — no pass issued,
-no error).
-
-### Shape B — legacy / smoke-test format
-
-Includes the full Contact object inline; used by smoke test workflows:
+**Shape B — legacy / smoke-test format:**
 
 ```json
 {
@@ -325,14 +308,95 @@ Includes the full Contact object inline; used by smoke test workflows:
 }
 ```
 
-### Webhook responses
+Shape B includes the full Contact object inline and is used by smoke test workflows
+(`MembershipActivated` or `MembershipRenewed`).
 
-| Status | Meaning |
+---
+
+### Processing logic — step by step
+
+```
+1. Verify ?secret= matches WILD_APRICOT_WEBHOOK_SECRET
+   └── fail → 401
+
+2. Determine shape from payload:
+   ├── MessageType = "TestWebhook"  → 200 (ping response)
+   ├── MessageType = "Membership"   → Shape A (continue below)
+   ├── EventType in ("MembershipActivated", "MembershipRenewed") → Shape B (skip to step 7)
+   └── Anything else                → 200 (ignored)
+
+─── Shape A only ───────────────────────────────────────────────
+
+3. Check Action == "RenewalDateChanged"
+   └── Any other action (StatusChanged, Added, LevelChanged, …) → 200 (ignored)
+
+4. Check Contact.Id present in payload
+   └── missing → 422
+
+5. Call Wild Apricot REST API to fetch full contact record
+   └── API unreachable / error → 502
+
+6. Check MembershipStatus == "Active" (from WA API response)
+   └── not Active (Lapsed, Pending, etc.) → 200 (ignored)
+
+7. Extract name, email, member_number, expiry_date
+   Note: Wild Apricot may store RenewalDue in FieldValues[] rather than the
+   top-level field — the API checks both locations automatically.
+
+8. Check expiry_date is not blank
+   └── blank → 200 (ignored)
+
+9. Check expiry_date >= today (UTC)
+   └── in the past → 200 (ignored)
+
+─── Common pass issuance (Shape A and Shape B) ─────────────────
+
+10. Validate all required fields present (name, email, member_number, expiry_date)
+    └── any missing → 422
+
+11. For each wallet type (Apple, Google):
+
+    a. Look up existing active (non-voided) pass for member_number + wallet_type
+
+    b. No existing pass:
+       → Issue new pass, pass_updated = True
+
+    c. Existing pass — nothing changed (same expiry_date, same email):
+       → Reuse existing pass URL, pass_updated = False  ← no email sent (deduplication)
+
+    d. Existing pass — email changed, expiry unchanged:
+       → Update email in database, reuse pass URL, pass_updated = True
+
+    e. Existing pass — expiry_date changed (renewal):
+       → Void old pass, issue new pass, pass_updated = True
+
+12. If pass_updated = True AND at least one pass URL succeeded:
+    → Send welcome email via SendGrid
+
+    If pass_updated = False (case c above — nothing changed):
+    → No email sent — webhook was a replay or duplicate, member already has correct pass
+
+13. Return 200
+```
+
+---
+
+### Edge cases
+
+| Situation | Behaviour |
 |---|---|
-| 200 | Processed successfully, or deliberately ignored (wrong action / non-Active / past date) |
-| 401 | Bad or missing `?secret=` |
-| 422 | Missing required fields (no `Contact.Id`) |
-| 502 | Could not reach Wild Apricot API to fetch contact details |
+| `Action` is not `RenewalDateChanged` (e.g. `StatusChanged`) | 200 — ignored. Only `RenewalDateChanged` triggers pass issuance |
+| Member joins and WA fires `RenewalDateChanged` before the date is set | Blank expiry_date → 200 silently ignored |
+| `RenewalDue` not at top level of WA contact JSON | Fallback to `FieldValues[]` array lookup — happens for new members |
+| Member is Active in WA but renewal date is in the past | 200 — ignored. Stale webhook or manual date correction |
+| WA fires webhook twice for the same renewal (replay) | Same expiry + same email → pass_updated = False → no duplicate email |
+| Member's email changed in WA, same renewal date | Email updated in database; existing pass URL reused; welcome email sent to new address |
+| Member renews (new expiry date) | Old passes voided, new passes issued, welcome email with new renewal date sent |
+| WA API is unreachable when fetching contact | 502 — WA will retry the webhook |
+| `Contact.Id` absent from Shape A payload | 422 — logged as rejected |
+| Both Apple and Google pass creation fail | 200 returned (don't block WA retry), error logged, no email sent |
+
+---
 
 ### TestWebhook ping
 
@@ -343,6 +407,17 @@ Wild Apricot sends a test ping when the webhook is first configured:
 ```
 
 The API returns `200` with `{"status": "ok", "message": "Rye Tri membership API is reachable."}`.
+
+---
+
+### Webhook responses
+
+| Status | Meaning |
+|---|---|
+| 200 | Processed, or deliberately ignored (see edge cases above) |
+| 401 | Bad or missing `?secret=` |
+| 422 | Missing `Contact.Id` or required member fields |
+| 502 | Wild Apricot API unreachable when fetching contact |
 
 ---
 
