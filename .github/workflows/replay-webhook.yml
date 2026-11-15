@@ -22,12 +22,13 @@ jobs:
           url = f"https://ryetri-prod-func.azurewebsites.net/api/webhook/wild-apricot?secret={secret}"
 
           payloads = [
-              ("StatusChanged Status 1 — expect no email",
-               {"AccountId":"530477","MessageType":"Membership","Parameters":{"Action":"StatusChanged","Contact.Id":"99886401","Membership.LevelId":"1828218","Membership.Status":"1"}}),
-              ("RenewalDateChanged — expect no email",
-               {"AccountId":"530477","MessageType":"Membership","Parameters":{"Action":"RenewalDateChanged","Contact.Id":"99886401","Membership.LevelId":"1828218","Membership.Status":"0"}}),
-              ("StatusChanged Status 20 — expect pass + email",
+              # Chronological order per WA webhook log
+              ("5:31 PM — StatusChanged Status 20 (Active) — expect pass + email",
                {"AccountId":"530477","MessageType":"Membership","Parameters":{"Action":"StatusChanged","Contact.Id":"99886401","Membership.LevelId":"1828218","Membership.Status":"20"}}),
+              ("5:37 PM — StatusChanged Status 1 — expect no email",
+               {"AccountId":"530477","MessageType":"Membership","Parameters":{"Action":"StatusChanged","Contact.Id":"99886401","Membership.LevelId":"1828218","Membership.Status":"1"}}),
+              ("5:37 PM — RenewalDateChanged Status 0 — expect no email",
+               {"AccountId":"530477","MessageType":"Membership","Parameters":{"Action":"RenewalDateChanged","Contact.Id":"99886401","Membership.LevelId":"1828218","Membership.Status":"0"}}),
           ]
 
           for label, body in payloads:
