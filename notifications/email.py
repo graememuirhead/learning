@@ -131,7 +131,7 @@ def _build_html(
                   <tr>
                     <td style="padding:6px 0;" colspan="2">
                       <span style="color:#888;font-size:11px;text-transform:uppercase;
-                                   letter-spacing:1px;">Valid Through</span><br>
+                                   letter-spacing:1px;">Renewal Date</span><br>
                       <strong style="color:#cc0000;font-size:15px;">{expiry_date}</strong>
                     </td>
                   </tr>

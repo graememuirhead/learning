@@ -239,7 +239,7 @@ def _build_generic_object(
             },
             {
                 "id": "expiry",
-                "header": "VALID THROUGH",
+                "header": "RENEWAL DATE",
                 "body": expiry_date,
             },
             {

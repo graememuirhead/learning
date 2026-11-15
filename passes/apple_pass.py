@@ -141,7 +141,7 @@ def _build_pass_json(
                 },
                 {
                     "key": "expiry",
-                    "label": "VALID THROUGH",
+                    "label": "RENEWAL DATE",
                     "value": expiry_date,
                     "textAlignment": "PKTextAlignmentRight",
                 },
@@ -153,7 +153,7 @@ def _build_pass_json(
                     "value": (
                         "Welcome to Rye Tri Club!\n\n"
                         "This card is personal and non-transferable. "
-                        "It is valid until the expiry date shown on the front.\n\n"
+                        "It is valid until the renewal date shown on the front.\n\n"
                         "www.ryetri.org"
                     ),
                 },
@@ -169,7 +169,7 @@ def _build_pass_json(
                 },
                 {
                     "key": "expiry_back",
-                    "label": "EXPIRY DATE",
+                    "label": "RENEWAL DATE",
                     "value": expiry_date,
                 },
             ],
