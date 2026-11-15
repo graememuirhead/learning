@@ -10,52 +10,41 @@ Smoke test #2 — reissue (void + recreate) via self-service endpoint:
 Run test #1 first; test #2 operates on the same member.
 These tests are excluded from normal CI runs.
 """
-from datetime import datetime
+import os
 
 import pytest
 import requests
 
-
-def _smoke_member_id() -> int:
-    # Hourly ID: a fresh smoke member per deploy so pass_updated is always True.
-    return int(f"9{datetime.utcnow().strftime('%Y%m%d%H')}")
+SMOKE_MEMBER_NUMBER = "TEST99999"
+SMOKE_EMAIL = "graeme@ryetriclub.com"
 
 
 @pytest.mark.smoke
-def test_smoke_welcome_email(func_url, webhook_secret):
+def test_smoke_welcome_email(func_url):
     """
-    Trigger a MembershipActivated webhook for today's smoke member.
-    Fresh passes are created each hour, so this always produces a new pass.
+    Issue (or reissue) a membership card for the smoke member via manual-send-card.
+    This always voids any existing pass and sends a fresh welcome email, making it
+    reliable regardless of how many times the smoke test runs in the same day.
     Check graeme@ryetriclub.com for the welcome email with Apple + Google buttons.
     """
-    if not webhook_secret:
-        pytest.skip("DEV_WEBHOOK_SECRET not set")
-
-    member_id = _smoke_member_id()
-    print(f"\n  Smoke member ID: {member_id}")
-
-    payload = {
-        "EventType": "MembershipActivated",
-        "AccountId": 123456,
-        "Parameters": {
-            "Contact": {
-                "FirstName": "Test",
-                "LastName": "Member",
-                "Email": "graeme@ryetriclub.com",
-                "Id": member_id,
-                "RenewalDue": "2099-12-31T00:00:00",
-            }
-        },
-    }
+    admin_secret = os.environ.get("ADMIN_SECRET", "")
+    if not admin_secret:
+        pytest.skip("ADMIN_SECRET not set")
 
     resp = requests.post(
-        f"{func_url}/webhook/wild-apricot",
-        params={"secret": webhook_secret},
-        json=payload,
+        f"{func_url}/manual-send-card",
+        json={
+            "admin_secret": admin_secret,
+            "member_number": SMOKE_MEMBER_NUMBER,
+            "email": SMOKE_EMAIL,
+            "name": "Test Member",
+            "expiry_date": "2099-12-31",
+        },
         timeout=60,
     )
-    assert resp.status_code == 200, f"Webhook returned {resp.status_code}: {resp.text[:300]}"
-    print("✓ Webhook accepted. Check graeme@ryetriclub.com for the welcome email.")
+    assert resp.status_code == 200, f"manual-send-card returned {resp.status_code}: {resp.text[:300]}"
+    print(f"\n  Smoke member: {SMOKE_MEMBER_NUMBER}")
+    print("✓ Card issued. Check graeme@ryetriclub.com for the welcome email.")
 
 
 @pytest.mark.smoke
@@ -66,8 +55,8 @@ def test_smoke_reissue_pass(func_url):
 
     Run test_smoke_welcome_email first (within the same hour) to create the initial passes.
     """
-    member_number = str(_smoke_member_id())
-    email = "graeme@ryetriclub.com"
+    member_number = SMOKE_MEMBER_NUMBER
+    email = SMOKE_EMAIL
 
     print(f"\n  Reissuing passes for smoke member: {member_number}")
 
