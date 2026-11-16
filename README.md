@@ -17,6 +17,7 @@ or renews via Wild Apricot, and can be reissued by the member or an admin at any
 - [Weekly Members Report](#weekly-members-report)
 - [Pass Expiry](#pass-expiry)
 - [Deployment](#deployment)
+- [GitHub Actions Secrets](#github-actions-secrets)
 - [Environment Variables](#environment-variables)
 - [Local Development](#local-development)
 - [Prerequisites](#prerequisites)
@@ -506,6 +507,41 @@ Prod deploy is triggered manually via GitHub Actions workflow dispatch (not on p
 |---|---|
 | Smoke test #1 (runs automatically in `deploy.yml`) | Issues a `TEST99999` pass via `manual-send-card` and sends a welcome email to graeme@ryetriclub.com |
 | `smoke-test.yml` (manual dispatch) | Voids and reissues the `TEST99999` pass, sends a second email |
+
+---
+
+## GitHub Actions Secrets
+
+These secrets must be set in **GitHub → Settings → Secrets and variables → Actions** for the
+CI/CD workflows (`deploy.yml`, `cleanup-test-passes.yml`, `smoke-test.yml`, etc.) to work.
+
+### Azure service principal (CI/CD identity)
+
+| Secret | Description |
+|---|---|
+| `AZURE_CLIENT_ID` | Service principal application (client) ID used by GitHub Actions to log in to Azure |
+| `AZURE_CLIENT_SECRET` | Service principal client secret (password) |
+| `AZURE_TENANT_ID` | Azure Active Directory tenant ID |
+| `AZURE_SUBSCRIPTION_ID` | Azure subscription ID that hosts the function apps and storage accounts |
+| `AZURE_TFSTATE_KEY` | Storage account access key for the Terraform remote state backend |
+
+The service principal needs at minimum **Contributor** on the resource groups (`ryetri-prod-rg`, `ryetri-dev-rg`) and **Storage Blob Data Contributor** on the Terraform state storage account.
+
+### Application secrets (deployed to Azure Function App settings)
+
+| Secret | Description |
+|---|---|
+| `ADMIN_SECRET` | Password for the admin send-card page at `/api/manual-send-card` and the admin web UI |
+| `WILD_APRICOT_API_KEY` | Wild Apricot server-to-server API key — used to fetch full contact records after a webhook fires |
+| `WILD_APRICOT_WEBHOOK_SECRET` | Secret token appended to the webhook URL (`?secret=…`) to authenticate inbound webhook calls from Wild Apricot |
+| `SENDGRID_API_KEY` | SendGrid API key with **Mail Send** permission — used for welcome emails and the weekly members report |
+| `APPLE_TEAM_IDENTIFIER` | 10-character Apple Developer Team ID |
+| `APPLE_PASS_CERTIFICATE_PEM` | Base64-encoded Pass Type ID certificate PEM (from Apple Developer Portal) |
+| `APPLE_PASS_KEY_PEM` | Base64-encoded private key PEM matching the Pass Type ID certificate |
+| `APPLE_WWDR_CERTIFICATE_PEM` | Base64-encoded Apple WWDR G3 intermediate certificate PEM (required for pass signing) |
+| `APPLE_KEY_PASSWORD` | Password for the Apple private key PEM (leave empty if the key has no passphrase) |
+| `GOOGLE_ISSUER_ID` | Google Wallet Issuer ID from the Google Pay & Wallet Console |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | Base64-encoded (or raw JSON) Google service account key with **Google Wallet Object Issuer** role |
 
 ---
 
