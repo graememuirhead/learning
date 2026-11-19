@@ -1074,6 +1074,9 @@ def _internal_error(message: str) -> func.HttpResponse:
 )
 def weekly_members_report(timer: func.TimerRequest) -> None:
     """Email a CSV of all active members to board@ryetriclub.com every Thursday."""
+    if Settings.IS_DEV:
+        logger.info("weekly-members-report: skipping in dev environment")
+        return
     logger.info("weekly-members-report starting")
     members = db.list_active_members()
     sent = send_members_report_email(members)
