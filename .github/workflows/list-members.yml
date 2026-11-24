@@ -1,0 +1,94 @@
+name: List Prod Members
+
+on:
+  workflow_dispatch:
+
+jobs:
+  list:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Azure login
+        run: |
+          az login --service-principal \
+            --username ${{ secrets.AZURE_CLIENT_ID }} \
+            --password ${{ secrets.AZURE_CLIENT_SECRET }} \
+            --tenant ${{ secrets.AZURE_TENANT_ID }}
+          az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Get storage connection string
+        run: |
+          CONN=$(az storage account show-connection-string \
+            --name ryetriprodst \
+            --resource-group ryetri-prod-rg \
+            --query connectionString -o tsv)
+          echo "STORAGE_CONNECTION_STRING=$CONN" >> $GITHUB_ENV
+
+      - name: Check Apple Wallet registrations
+        env:
+          STORAGE_CONNECTION_STRING: ${{ env.STORAGE_CONNECTION_STRING }}
+        run: |
+          pip install azure-data-tables -q
+          python3 << 'EOF'
+          import os
+          from azure.data.tables import TableServiceClient
+
+          conn = os.environ["STORAGE_CONNECTION_STRING"]
+          service = TableServiceClient.from_connection_string(conn)
+
+          # Get active members (deduplicated by member number)
+          passes_client = service.get_table_client("IssuedPasses")
+          entities = list(passes_client.query_entities(
+              "PartitionKey eq 'RyeTri'",
+              select=["Name", "MemberNumber", "ExpiryDate", "Voided", "RowKey"],
+          ))
+
+          seen = set()
+          active = []
+          for e in entities:
+              if e.get("Voided"):
+                  continue
+              name = (e.get("Name") or "").strip().lower()
+              if "test member" in name:
+                  continue
+              mn = e.get("MemberNumber", "")
+              if mn not in seen:
+                  seen.add(mn)
+                  active.append(e)
+
+          # Get all device registrations (serial numbers that have been added to Apple Wallet)
+          try:
+              reg_client = service.get_table_client("DeviceRegistrations")
+              registrations = list(reg_client.list_entities(
+                  select=["PartitionKey", "RowKey", "SerialNumber"],
+              ))
+              registered_serials = set()
+              for r in registrations:
+                  # RowKey or SerialNumber field holds the pass serial
+                  registered_serials.add(r.get("RowKey", ""))
+                  if r.get("SerialNumber"):
+                      registered_serials.add(r["SerialNumber"])
+          except Exception as ex:
+              print(f"Could not read DeviceRegistrations: {ex}")
+              registered_serials = set()
+
+          # Also check IssuedPasses RowKeys against registrations
+          # RowKey in IssuedPasses is the serial number (UUID)
+          added = [m for m in active if m.get("RowKey", "") in registered_serials]
+          not_added = [m for m in active if m.get("RowKey", "") not in registered_serials]
+
+          print(f"\nTotal active members: {len(active)}")
+          print(f"Added to Apple Wallet: {len(added)}")
+          print(f"Not added: {len(not_added)}")
+
+          print(f"\n--- Added to Apple Wallet ({len(added)}) ---")
+          for m in sorted(added, key=lambda x: x.get("Name", "")):
+              print(f"  {m.get('Name',''):<30} #{m.get('MemberNumber','')}")
+
+          print(f"\n--- Not added ({len(not_added)}) ---")
+          for m in sorted(not_added, key=lambda x: x.get("Name", "")):
+              print(f"  {m.get('Name',''):<30} #{m.get('MemberNumber','')}")
+
+          print(f"\n--- All registrations in DeviceRegistrations table ---")
+          for r in registrations:
+              print(f"  {r}")
+          EOF
