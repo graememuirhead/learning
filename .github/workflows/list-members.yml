@@ -1,0 +1,49 @@
+name: List Prod Members
+
+on:
+  workflow_dispatch:
+
+jobs:
+  list:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Azure login
+        run: |
+          az login --service-principal \
+            --username ${{ secrets.AZURE_CLIENT_ID }} \
+            --password ${{ secrets.AZURE_CLIENT_SECRET }} \
+            --tenant ${{ secrets.AZURE_TENANT_ID }}
+          az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Get storage connection string
+        run: |
+          CONN=$(az storage account show-connection-string \
+            --name ryetriprodst \
+            --resource-group ryetri-prod-rg \
+            --query connectionString -o tsv)
+          echo "STORAGE_CONNECTION_STRING=$CONN" >> $GITHUB_ENV
+
+      - name: List all tables and device registrations
+        env:
+          STORAGE_CONNECTION_STRING: ${{ env.STORAGE_CONNECTION_STRING }}
+        run: |
+          pip install azure-data-tables -q
+          python3 << 'EOF'
+          import os
+          from azure.data.tables import TableServiceClient
+
+          conn = os.environ["STORAGE_CONNECTION_STRING"]
+          service = TableServiceClient.from_connection_string(conn)
+
+          print("=== All tables in storage account ===")
+          for t in service.list_tables():
+              print(f"  {t['name']}")
+
+          print("\n=== Dumping every table ===")
+          for t in service.list_tables():
+              client = service.get_table_client(t['name'])
+              rows = list(client.list_entities())
+              print(f"\n--- {t['name']} ({len(rows)} rows) ---")
+              for r in rows:
+                  print(f"  {dict(r)}")
+          EOF
