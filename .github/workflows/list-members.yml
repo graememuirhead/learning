@@ -35,15 +35,16 @@ jobs:
           conn = os.environ["STORAGE_CONNECTION_STRING"]
           service = TableServiceClient.from_connection_string(conn)
 
+          tables = list(service.list_tables())
           print("=== All tables in storage account ===")
-          for t in service.list_tables():
-              print(f"  {t['name']}")
+          for t in tables:
+              print(f"  {t.name}")
 
           print("\n=== Dumping every table ===")
-          for t in service.list_tables():
-              client = service.get_table_client(t['name'])
+          for t in tables:
+              client = service.get_table_client(t.name)
               rows = list(client.list_entities())
-              print(f"\n--- {t['name']} ({len(rows)} rows) ---")
+              print(f"\n--- {t.name} ({len(rows)} rows) ---")
               for r in rows:
                   print(f"  {dict(r)}")
           EOF
